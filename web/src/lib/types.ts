@@ -145,6 +145,9 @@ export interface AncestorInfo {
   status: NodeStatus
   stale: boolean
   invalidation_reason: string | null
+  is_vision: boolean
+  // Levels above this node: 1 = parent, increasing toward the vision node.
+  depth: number
 }
 
 export interface NodeContext {

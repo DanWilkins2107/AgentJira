@@ -187,14 +187,16 @@ export function NodePage() {
 }
 
 /**
- * Ancestor breadcrumb via node_context. Assumes the chain is ordered vision-first;
+ * Ancestor breadcrumb via node_context. The RPC returns ancestors nearest-parent-first
+ * (depth 1 = parent, increasing toward the vision node), so render depth-descending;
  * links are status-colored and stale/invalidated ancestors get a loud flag.
  */
 function Breadcrumb({ ancestors, node }: { ancestors: AncestorInfo[]; node: TaskNode }) {
+  const chain = [...ancestors].sort((a, b) => b.depth - a.depth)
   return (
     <nav className="breadcrumb">
       <Link to={`/p/${node.project_id}`}>Graph</Link>
-      {ancestors.map((a) => (
+      {chain.map((a) => (
         <span key={a.id} className="crumb">
           <span className="crumb-sep">›</span>
           <Link
