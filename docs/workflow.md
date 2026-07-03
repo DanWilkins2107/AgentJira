@@ -1,0 +1,123 @@
+# AgentJira — Workflow Stages
+
+How a node moves from braindump to merged PR. Exact names and rules live in [architecture.md](architecture.md); this page is the picture. Colors in the app follow one rule: **brighter = human needed**.
+
+## The status machine
+
+Every node is in exactly one status, and each status belongs to a turn: **human**, **agent**, **github**, or **none** (terminal/container).
+
+```mermaid
+stateDiagram-v2
+    human_braindump_needed : human_braindump_needed (human)
+    awaiting_agent_breakdown : awaiting_agent_breakdown (agent)
+    awaiting_human_response : awaiting_human_response (human)
+    split_proposed : split_proposed (human)
+    split_approved : split_approved (agent)
+    broken_down : broken_down (none)
+    awaiting_agent_spec : awaiting_agent_spec (agent)
+    spec_review : spec_review (human)
+    ready_for_pickup : ready_for_pickup (agent)
+    pr_raised : pr_raised (github)
+    done : done (none)
+    invalidated : invalidated (none)
+
+    [*] --> human_braindump_needed : project created (vision node)
+    human_braindump_needed --> awaiting_agent_breakdown : human braindumps text + canvas
+    awaiting_agent_breakdown --> awaiting_human_response : agent asks a question
+    awaiting_human_response --> awaiting_agent_breakdown : human answers
+    awaiting_agent_breakdown --> split_proposed : agent proposes a split
+    awaiting_agent_breakdown --> awaiting_agent_spec : already PR-sized, agent routes to spec
+    split_proposed --> split_approved : human approves
+    split_proposed --> awaiting_agent_breakdown : human rejects
+    split_approved --> broken_down : agent materializes children + subtask edges
+    awaiting_agent_spec --> awaiting_human_response : agent asks a question
+    awaiting_human_response --> awaiting_agent_spec : human answers
+    awaiting_agent_spec --> spec_review : agent submits tiny spec
+    spec_review --> ready_for_pickup : human approves spec
+    spec_review --> awaiting_agent_spec : human rejects with review_comment
+    ready_for_pickup --> pr_raised : agent raises PR (GHA pr_opened, aj link-pr)
+    pr_raised --> done : GitHub approval, GHA merges, pr_merged
+
+    note right of invalidated
+        Reachable from any status via
+        invalidate (reason required).
+        Kept forever as context.
+    end note
+```
+
+Orthogonal to status: `stale` (an ancestor was invalidated; premise needs re-checking) and `claimed_by` (an agent session is actively on it; humans clear stuck claims from the UI).
+
+## The breakdown loop
+
+The top half of a node's life: human braindumps, agent asks, human answers, agent proposes a split, human approves, agent materializes.
+
+```mermaid
+sequenceDiagram
+    actor Human
+    participant Board as AgentJira board
+    actor Agent
+
+    Human->>Board: braindump on node (text + tldraw canvas)
+    Note over Board: awaiting_agent_breakdown
+    Agent->>Board: aj claim, then aj context (reads canvas PNGs)
+    Agent->>Board: aj post --type question
+    Note over Board: awaiting_human_response
+    Human->>Board: answer in thread, hand turn back
+    Note over Board: awaiting_agent_breakdown
+    Agent->>Board: aj propose-split (numbered children, one-line scopes, suggested blocks)
+    Note over Board: split_proposed
+    Human->>Board: approve (split_decision message)
+    Note over Board: split_approved
+    Agent->>Board: aj create-node --parent for each child
+    Agent->>Board: aj add-edge for firm/soft blocks between siblings
+    Agent->>Board: aj set-status parent broken_down
+    Note over Board: broken_down — work continues in the children
+```
+
+The question loop can repeat as often as needed — regular human intervention is the point, not a failure mode. Children that are already PR-sized skip further splitting and go straight to `awaiting_agent_spec`.
+
+## The PR endgame
+
+The bottom half: spec approved, agent implements, GitHub review is the final human gate, the GHA does the rest.
+
+```mermaid
+sequenceDiagram
+    actor Human
+    participant Board as AgentJira board
+    actor Agent
+    participant GitHub
+    participant GHA as GHA (agentjira.yml)
+
+    Human->>Board: approve spec
+    Note over Board: ready_for_pickup
+    Agent->>Board: aj claim, then aj context
+    Agent->>Agent: implement on a git branch per the spec
+    Agent->>GitHub: open PR — title [AJ] node title, body has AgentJira-Node marker
+    Agent->>Board: aj link-pr (backup path)
+    GHA->>Board: POST pr_opened to github-sync
+    Note over Board: pr_raised — GHA owns status from here
+    Human->>GitHub: review and approve the PR
+    GHA->>Board: POST pr_approved
+    GHA->>GitHub: poll checks until green, gh pr merge --squash
+    GHA->>Board: POST pr_merged with merge SHA
+    Note over Board: done — merge_sha recorded, nothing else cascades
+```
+
+Post-merge, nothing auto-advances: dependents' "unblocked" state is derived from edges, never cascaded writes.
+
+## Invalidation and staleness
+
+When a premise turns out wrong, the node is **invalidated** (reason required, recorded forever). Everything built on it gets flagged `stale`:
+
+```mermaid
+flowchart TD
+    inv[invalidate node<br/>reason recorded] --> desc[descendants via subtask edges<br/>stale = true]
+    inv --> fb[firm_block targets<br/>stale = true]
+    desc --> recheck[premise re-checked by human or agent]
+    fb --> recheck
+    recheck --> norm[norm - invalidate stale work<br/>and recreate fresh nodes]
+```
+
+- The walk is recursive over non-removed `subtask` edges and `firm_block` targets, cycle-safe, depth-capped at 50. Even `done` nodes get `stale = true` — a merged premise can still be stale.
+- `stale` renders as a dashed amber ring; invalidated ancestors are flagged in every descendant's breadcrumb.
+- **Invalidated nodes are not trash.** They stay first-class, readable, and searchable — the invalidation reason is exactly the context that stops the next agent repeating the mistake. Nothing is ever deleted.
