@@ -1,0 +1,27 @@
+{
+  "name": "agentjira-cli",
+  "version": "0.1.0",
+  "description": "aj — the agent-facing CLI for AgentJira (wraps supabase-js with the dedicated agent user's login)",
+  "type": "module",
+  "bin": {
+    "aj": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}
