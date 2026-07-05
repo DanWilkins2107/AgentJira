@@ -1,0 +1,194 @@
+/* StageFlow stepper + node-page invalidation treatment.
+   Imported by StageFlow.tsx. NodePage (and its ActionBar) always import the
+   StageFlow module, so these classes are guaranteed loaded on the node page
+   without touching styles.css (owned by the graph-view work). */
+
+.stage-flow {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 14px 10px;
+  margin-bottom: 14px;
+}
+
+/* ---- rail ---- */
+
+.stage-flow-rail {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.stage-flow-rail.sf-rail-dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.sf-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 92px;
+  text-align: center;
+}
+.sf-dotwrap {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sf-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  display: inline-block;
+}
+.sf-current .sf-dot {
+  width: 22px;
+  height: 22px;
+}
+.sf-label {
+  font-size: 10.5px;
+  line-height: 1.25;
+  margin-top: 2px;
+  font-weight: 600;
+}
+.sf-current .sf-label {
+  font-weight: 800;
+  font-size: 11px;
+}
+.sf-visited .sf-label {
+  color: var(--text);
+}
+.sf-skipped .sf-label {
+  color: var(--muted);
+  font-weight: 400;
+}
+.sf-future .sf-label {
+  color: var(--muted);
+  font-weight: 400;
+}
+.sf-future {
+  opacity: 0.55;
+}
+.sf-caption {
+  font-size: 9.5px;
+  font-style: italic;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.sf-conn {
+  flex: 1 0 22px;
+  min-width: 18px;
+  height: 3px;
+  margin-top: 13.5px;
+  border-radius: 2px;
+}
+.sf-conn-done {
+  background: #868e96;
+}
+.sf-conn-future {
+  background: var(--border);
+  opacity: 0.6;
+}
+
+/* off-rail chip (awaiting_human_response side loop / invalidated) */
+.sf-offrail {
+  margin-top: 6px;
+  border: 1.5px solid;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  max-width: 150px;
+  background: var(--surface);
+}
+
+/* fork shown before a branch has been chosen: both futures, dimmed */
+.sf-fork {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.sf-fork-branch {
+  display: flex;
+  align-items: flex-start;
+}
+.sf-fork-caption {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--muted);
+  margin-top: 10px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+/* ---- primary next action ---- */
+
+.stage-flow-next {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.sf-next-btn {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 10px 20px;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+}
+.sf-next-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.sf-cue {
+  font-weight: 800;
+  font-size: 14px;
+  border: 1.5px solid;
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--text);
+}
+.sf-hint {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ---- inherited-invalidation treatment (NodePage header + banner) ---- */
+
+.banner-inherited-invalid {
+  border-width: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px 16px;
+}
+.node-title-invalidated {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+/* ---- demoted manual set-status (ActionBar escape hatch) ---- */
+
+.action-manual-details {
+  margin-top: 10px;
+  width: 100%;
+}
+.action-manual-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.action-manual-details .action-manual {
+  margin-left: 0;
+  margin-top: 8px;
+  display: inline-flex;
+}

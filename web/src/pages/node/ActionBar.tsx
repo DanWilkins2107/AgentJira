@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
+import { isNodeStatus } from '../../components/StageFlow'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { NODE_STATUSES } from '../../lib/types'
-import type { MessageType, NodeStatus, TaskNode } from '../../lib/types'
+import type { EventRow, MessageType, NodeStatus, TaskNode } from '../../lib/types'
 
 /**
  * Contextual actions per the contract:
@@ -10,13 +12,45 @@ import type { MessageType, NodeStatus, TaskNode } from '../../lib/types'
  *   both posting a split_decision message with the human's note.
  * - spec_review: approve → ready_for_pickup / reject → awaiting_agent_spec + required review_comment.
  * - invalidate (dialog, required reason) → invalidate_node RPC.
- * - unclaim; manual set-status escape hatch.
+ * - restore (dialog, invalidated nodes only): reverses an invalidation — sets status
+ *   back to the pre-invalidation status (from events, human may override) and clears
+ *   invalidation_reason. Never deletes anything.
+ * - unclaim; manual set-status demoted into a collapsed "Advanced" escape hatch.
  */
-export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Promise<void> }) {
+
+// Approve/Reject ARE the "next" buttons when it's the human's decision turn —
+// promoted styling so the StageFlow cue ("your decision needed below") lands here.
+const promotedStyle: CSSProperties = { fontSize: 15, fontWeight: 700, padding: '10px 20px' }
+
+/** Default restore target: the `from` of the most recent transition into 'invalidated'. */
+function defaultRestoreTarget(events: EventRow[]): NodeStatus {
+  for (const e of events) {
+    // events are newest-first
+    if (e.type !== 'node.status_changed') continue
+    if (e.data['to'] === 'invalidated') {
+      const from = e.data['from']
+      if (isNodeStatus(from) && from !== 'invalidated') return from
+    }
+  }
+  return 'awaiting_agent_breakdown'
+}
+
+export function ActionBar({
+  node,
+  events,
+  reload,
+}: {
+  node: TaskNode
+  events: EventRow[]
+  reload: () => Promise<void>
+}) {
   const { session } = useAuth()
   const [note, setNote] = useState('')
   const [showInvalidate, setShowInvalidate] = useState(false)
   const [invalidateReason, setInvalidateReason] = useState('')
+  const [showRestore, setShowRestore] = useState(false)
+  const [restoreTarget, setRestoreTarget] = useState<NodeStatus>('awaiting_agent_breakdown')
+  const [restoreNote, setRestoreNote] = useState('')
   const [manualStatus, setManualStatus] = useState<NodeStatus>(node.status)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -94,6 +128,30 @@ export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Prom
     })
   }
 
+  function openRestore() {
+    setRestoreTarget(defaultRestoreTarget(events))
+    setRestoreNote('')
+    setShowRestore(true)
+  }
+
+  async function restore() {
+    await run(async () => {
+      if (restoreNote.trim()) {
+        // Explain the restore in the thread at the stage it happened (invalidated).
+        const msgErr = await postMessage('note', restoreNote.trim(), node.status)
+        if (msgErr) return msgErr
+      }
+      // The DB trigger logs the status change; we never write events ourselves.
+      const { error } = await supabase
+        .from('nodes')
+        .update({ status: restoreTarget, invalidation_reason: null })
+        .eq('id', node.id)
+      if (error) return error.message
+      setShowRestore(false)
+      return null
+    })
+  }
+
   async function unclaim() {
     await run(async () => {
       const { error } = await supabase
@@ -131,10 +189,20 @@ export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Prom
       <div className="action-buttons">
         {node.status === 'split_proposed' ? (
           <>
-            <button disabled={busy} className="btn-approve" onClick={() => splitDecision(true)}>
+            <button
+              disabled={busy}
+              className="btn-approve"
+              style={promotedStyle}
+              onClick={() => splitDecision(true)}
+            >
               Approve split
             </button>
-            <button disabled={busy} className="btn-reject" onClick={() => splitDecision(false)}>
+            <button
+              disabled={busy}
+              className="btn-reject"
+              style={promotedStyle}
+              onClick={() => splitDecision(false)}
+            >
               Reject split
             </button>
           </>
@@ -142,10 +210,20 @@ export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Prom
 
         {node.status === 'spec_review' ? (
           <>
-            <button disabled={busy} className="btn-approve" onClick={() => specDecision(true)}>
+            <button
+              disabled={busy}
+              className="btn-approve"
+              style={promotedStyle}
+              onClick={() => specDecision(true)}
+            >
               Approve spec
             </button>
-            <button disabled={busy || !note.trim()} className="btn-reject" onClick={() => specDecision(false)}>
+            <button
+              disabled={busy || !note.trim()}
+              className="btn-reject"
+              style={promotedStyle}
+              onClick={() => specDecision(false)}
+            >
               Reject spec
             </button>
           </>
@@ -161,8 +239,15 @@ export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Prom
           <button disabled={busy} className="btn-danger" onClick={() => setShowInvalidate(true)}>
             Invalidate…
           </button>
-        ) : null}
+        ) : (
+          <button disabled={busy} className="btn-approve" onClick={openRestore}>
+            Restore node…
+          </button>
+        )}
+      </div>
 
+      <details className="action-manual-details">
+        <summary>Advanced: set status manually (escape hatch)</summary>
         <span className="action-manual">
           <select
             value={manualStatus}
@@ -179,7 +264,48 @@ export function ActionBar({ node, reload }: { node: TaskNode; reload: () => Prom
             Set status
           </button>
         </span>
-      </div>
+      </details>
+
+      {showRestore ? (
+        <div className="dialog-backdrop" onClick={() => setShowRestore(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Restore node</h3>
+            <p className="muted">
+              Reverses the invalidation: sets the status back (default = the status it had before
+              being invalidated) and clears the reason. Descendants that were only
+              inherited-invalidated come back automatically. <code>stale</code> flags on descendants
+              are NOT auto-cleared — their premises still need re-checking. Nothing is deleted.
+            </p>
+            <label>
+              Restore to status
+              <select
+                value={restoreTarget}
+                onChange={(e) => setRestoreTarget(e.target.value as NodeStatus)}
+              >
+                {NODE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <textarea
+              rows={3}
+              value={restoreNote}
+              onChange={(e) => setRestoreNote(e.target.value)}
+              placeholder="Optional note explaining the restore (posted to the thread)…"
+            />
+            <div className="action-buttons">
+              <button className="btn-approve" disabled={busy} onClick={restore}>
+                Restore
+              </button>
+              <button className="btn-small" disabled={busy} onClick={() => setShowRestore(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showInvalidate ? (
         <div className="dialog-backdrop" onClick={() => setShowInvalidate(false)}>

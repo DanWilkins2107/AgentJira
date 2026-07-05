@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { StageFlow } from '../components/StageFlow'
 import { StatusPill } from '../components/StatusPill'
 import { STATUS_META, TURN_LABEL, statusRgba } from '../lib/statusMeta'
 import { supabase } from '../lib/supabase'
@@ -9,6 +10,7 @@ import type {
   Message,
   NodeContext,
   NodeEdge,
+  NodeStatus,
   TaskNode,
 } from '../lib/types'
 import { ActionBar } from './node/ActionBar'
@@ -83,6 +85,17 @@ export function NodePage() {
     }
   }, [node, bodyLoaded])
 
+  // Single place for programmatic status writes (StageFlow next buttons).
+  const setNodeStatus = useCallback(
+    async (status: NodeStatus) => {
+      if (!nodeId) return
+      const { error: err } = await supabase.from('nodes').update({ status }).eq('id', nodeId)
+      if (err) setError(err.message)
+      else await load()
+    },
+    [nodeId, load],
+  )
+
   async function saveBody() {
     if (!node) return
     const { error: err } = await supabase.from('nodes').update({ body: bodyDraft }).eq('id', node.id)
@@ -95,26 +108,31 @@ export function NodePage() {
 
   const meta = STATUS_META[node.status]
   const ancestors = context?.ancestors ?? []
-  const troubledAncestors = ancestors.filter((a) => a.status === 'invalidated' || a.stale)
+  // Effective invalidation is derived at read time, never persisted: a node is
+  // effectively invalidated if its own status is 'invalidated' OR any ancestor
+  // (via non-removed subtask edges — what node_context walks) is invalidated.
+  // Restoring the ancestor therefore un-invalidates every descendant automatically.
+  const invalidatedAncestors = ancestors.filter((a) => a.status === 'invalidated')
+  const staleAncestors = ancestors.filter((a) => a.stale && a.status !== 'invalidated')
+  const inheritedInvalidated = invalidatedAncestors.length > 0
+  const effectivelyInvalidated = node.status === 'invalidated' || inheritedInvalidated
 
   return (
     <div className="page node-page">
       <Breadcrumb ancestors={ancestors} node={node} />
 
-      {troubledAncestors.map((a) => (
-        <div key={a.id} className="banner banner-danger">
-          {a.status === 'invalidated' ? (
-            <>
-              ⚠ Ancestor <Link to={`/n/${a.id}`}>{a.title}</Link> was <strong>invalidated</strong>
-              {a.invalidation_reason ? <>: “{a.invalidation_reason}”</> : null} — this node descends
-              from a dead premise.
-            </>
-          ) : (
-            <>
-              ⚠ Ancestor <Link to={`/n/${a.id}`}>{a.title}</Link> is <strong>stale</strong> — its
-              premise needs re-checking.
-            </>
-          )}
+      {invalidatedAncestors.map((a) => (
+        <div key={a.id} className="banner banner-danger banner-inherited-invalid">
+          ✕ This node is <strong>INVALIDATED</strong> (inherited from ancestor{' '}
+          <Link to={`/n/${a.id}`}>“{a.title}”</Link>
+          {a.invalidation_reason ? <>: “{a.invalidation_reason}”</> : null}). Restoring that
+          ancestor restores this node.
+        </div>
+      ))}
+      {staleAncestors.map((a) => (
+        <div key={a.id} className="banner banner-warn">
+          ⚠ Ancestor <Link to={`/n/${a.id}`}>{a.title}</Link> is <strong>stale</strong> — its
+          premise needs re-checking.
         </div>
       ))}
       {node.stale ? (
@@ -124,20 +142,43 @@ export function NodePage() {
       ) : null}
       {node.status === 'invalidated' ? (
         <div className="banner banner-danger">
-          ✕ Invalidated{node.invalidation_reason ? <>: “{node.invalidation_reason}”</> : null}
+          ✕ Invalidated{node.invalidation_reason ? <>: “{node.invalidation_reason}”</> : null} — use
+          “Restore node…” below to reverse.
         </div>
       ) : null}
 
       <div className="node-head">
-        <h1>
+        <h1 className={effectivelyInvalidated ? 'node-title-invalidated' : undefined}>
           {node.is_vision ? <span className="task-node-vision">★ </span> : null}
           {node.title}
         </h1>
         <div className="node-head-status">
           <StatusPill status={node.status} />
-          <span className="turn-indicator" style={{ color: statusRgba(node.status) }}>
-            {TURN_LABEL[meta.turn]}
-          </span>
+          {inheritedInvalidated && node.status !== 'invalidated' ? (
+            <>
+              <span
+                className="status-pill"
+                style={{
+                  backgroundColor: statusRgba('invalidated', 0.18),
+                  border: `1.5px solid ${statusRgba('invalidated')}`,
+                }}
+                title="Derived from an invalidated ancestor — nothing was written to this node"
+              >
+                <span
+                  className="status-pill-dot"
+                  style={{ backgroundColor: statusRgba('invalidated') }}
+                />
+                Invalidated (inherited)
+              </span>
+              <span className="muted" style={{ fontSize: 12 }}>
+                stored status preserved — springs back when the ancestor is restored
+              </span>
+            </>
+          ) : (
+            <span className="turn-indicator" style={{ color: statusRgba(node.status) }}>
+              {TURN_LABEL[meta.turn]}
+            </span>
+          )}
           {node.claimed_by ? (
             <span className="claimed-badge">
               <span className="claimed-dot" /> claimed by {node.claimed_by}
@@ -148,7 +189,9 @@ export function NodePage() {
 
       {error ? <div className="form-error">{error}</div> : null}
 
-      <ActionBar node={node} reload={load} />
+      <StageFlow node={node} events={events} onSetStatus={setNodeStatus} />
+
+      <ActionBar node={node} events={events} reload={load} />
 
       <div className="card body-editor">
         <h3>Body</h3>
