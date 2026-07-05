@@ -45,7 +45,83 @@ export function statusRgba(status: NodeStatus, alpha = 1): string {
   return `rgba(${r}, ${g}, ${b}, ${meta.alpha * alpha})`
 }
 
-export const STALE_RING = '#f59f00' // dashed 3px amber ring when stale=true
+/** Amber for the solid "STALE" corner badge when stale=true. */
+export const STALE_BADGE = '#f59f00'
+
+const DARK_CARD_BG = '#1f2226'
+const DARK_MUTED_CARD_BG = '#232529'
+const DARK_TEXT = '#1a1b1e'
+const LIGHT_TEXT = '#f1f3f5'
+
+/**
+ * How a graph card (and its legend swatch) renders a status. Encodes the
+ * turn split by brightness: human-turn = light/bright status-colored card;
+ * agent-turn = dark card with the status color as border + left accent bar;
+ * github/none = dark and muted; invalidated = gray, heavily dimmed.
+ */
+export interface CardTreatment {
+  background: string
+  borderColor: string
+  text: string
+  /** Left accent bar color (dark cards only). */
+  accentBar?: string
+  /** Outer glow (light human-turn cards only). */
+  glow?: string
+  /** Whole-card opacity for heavily dimmed states (invalidated). */
+  dim?: number
+  pillBackground: string
+  pillText: string
+}
+
+/**
+ * Card treatment for a status. Pass `inheritedInvalid` when the node's own
+ * status isn't `invalidated` but an ancestor's is — it renders with the
+ * invalidated treatment (derived, never persisted).
+ */
+export function cardTreatment(status: NodeStatus, inheritedInvalid = false): CardTreatment {
+  if (status === 'invalidated' || inheritedInvalid) {
+    return {
+      background: DARK_MUTED_CARD_BG,
+      borderColor: statusRgba('invalidated', 0.6),
+      text: '#8d939a',
+      dim: 0.55,
+      pillBackground: statusRgba('invalidated', 0.35),
+      pillText: '#ced4da',
+    }
+  }
+  const turn = STATUS_META[status].turn
+  if (turn === 'human') {
+    // Light/bright: near-solid status background, dark text, subtle glow.
+    return {
+      background: statusRgba(status, 0.88),
+      borderColor: statusRgba(status),
+      text: DARK_TEXT,
+      glow: `0 0 12px 2px ${statusRgba(status, 0.45)}`,
+      pillBackground: 'rgba(26, 27, 30, 0.82)',
+      pillText: statusRgba(status),
+    }
+  }
+  if (turn === 'agent') {
+    // Dark: neutral dark background, status color as border + accent bar.
+    return {
+      background: DARK_CARD_BG,
+      borderColor: statusRgba(status),
+      text: LIGHT_TEXT,
+      accentBar: statusRgba(status),
+      pillBackground: statusRgba(status),
+      pillText: '#fff',
+    }
+  }
+  // github / none: dark and muted; done/broken_down keep their contract
+  // alphas (via statusRgba), which visibly fades their border and pill.
+  return {
+    background: DARK_MUTED_CARD_BG,
+    borderColor: statusRgba(status, 0.75),
+    text: '#c4c9ce',
+    pillBackground: statusRgba(status, 0.85),
+    pillText: '#fff',
+  }
+}
 
 export interface EdgeStyleMeta {
   stroke: string
