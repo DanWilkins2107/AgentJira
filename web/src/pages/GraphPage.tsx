@@ -7,12 +7,22 @@ import { Legend } from '../components/Legend'
 import { SearchBox } from '../components/SearchBox'
 import { TaskNodeView } from '../components/TaskNodeView'
 import type { TaskFlowNode } from '../components/TaskNodeView'
-import { acyclicSubtaskEdges, layoutPositions } from '../lib/graphLayout'
+import { acyclicLayoutEdges, layoutPositions } from '../lib/graphLayout'
+import { effectivelyInvalidated } from '../lib/invalidation'
 import { EDGE_STYLE } from '../lib/statusMeta'
 import { supabase } from '../lib/supabase'
 import type { NodeEdge, Project, TaskNode } from '../lib/types'
 
 const nodeTypes = { task: TaskNodeView }
+
+/** Per-edge-type rendering: subtask = ubiquitous scaffolding (thinner, faded);
+ * blocks = emphasized on top; relates_to = faint context. */
+const EDGE_RENDER: Record<NodeEdge['type'], { width: number; opacity: number; zIndex: number }> = {
+  subtask: { width: 2, opacity: 0.55, zIndex: 0 },
+  firm_block: { width: 2.5, opacity: 1, zIndex: 1 },
+  soft_block: { width: 2.5, opacity: 1, zIndex: 1 },
+  relates_to: { width: 1.5, opacity: 0.45, zIndex: 0 },
+}
 
 export function GraphPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -21,6 +31,23 @@ export function GraphPage() {
   const [taskNodes, setTaskNodes] = useState<TaskNode[]>([])
   const [taskEdges, setTaskEdges] = useState<NodeEdge[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Human-view convenience only — agents are always served invalidated
+  // context (contract); this never changes what is fetched.
+  const storageKey = `aj:hideInvalidated:${projectId ?? ''}`
+  const [hideInvalidated, setHideInvalidated] = useState<boolean>(
+    () => localStorage.getItem(storageKey) === '1',
+  )
+  useEffect(() => {
+    setHideInvalidated(localStorage.getItem(storageKey) === '1')
+  }, [storageKey])
+  const onToggleHideInvalidated = useCallback(
+    (checked: boolean) => {
+      setHideInvalidated(checked)
+      localStorage.setItem(storageKey, checked ? '1' : '0')
+    },
+    [storageKey],
+  )
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -47,37 +74,51 @@ export function GraphPage() {
   }, [load])
 
   const { flowNodes, flowEdges } = useMemo(() => {
+    // Derived, never persisted: descendants of invalidated nodes read as
+    // invalidated too, and come back automatically if the ancestor is restored.
+    const invalidSet = effectivelyInvalidated(taskNodes, taskEdges)
+
+    const visibleNodes = hideInvalidated
+      ? taskNodes.filter((n) => !invalidSet.has(n.id))
+      : taskNodes
+    const visibleIds = new Set(visibleNodes.map((n) => n.id))
+    const visibleEdges = hideInvalidated
+      ? taskEdges.filter((e) => visibleIds.has(e.source_id) && visibleIds.has(e.target_id))
+      : taskEdges
+
     // Dagre needs an acyclic graph; cycles are legal data, so de-cycle for
     // layout only — every non-removed edge is still rendered.
-    const layoutEdges = acyclicSubtaskEdges(taskNodes, taskEdges)
-    const positions = layoutPositions(taskNodes, layoutEdges)
+    const layoutEdges = acyclicLayoutEdges(visibleNodes, visibleEdges)
+    const positions = layoutPositions(visibleNodes, layoutEdges)
 
-    const flowNodes: TaskFlowNode[] = taskNodes.map((n) => ({
+    const flowNodes: TaskFlowNode[] = visibleNodes.map((n) => ({
       id: n.id,
       type: 'task',
       position: positions.get(n.id) ?? { x: 0, y: 0 },
-      data: { task: n },
+      data: { task: n, inheritedInvalid: invalidSet.has(n.id) && n.status !== 'invalidated' },
     }))
 
-    const flowEdges: FlowEdge[] = taskEdges.map((e) => {
+    const flowEdges: FlowEdge[] = visibleEdges.map((e) => {
       const style = EDGE_STYLE[e.type]
+      const render = EDGE_RENDER[e.type]
       return {
         id: e.id,
         source: e.source_id,
         target: e.target_id,
-        type: 'smoothstep',
+        type: 'default', // bezier — organic curves instead of orthogonal steps
         style: {
           stroke: style.stroke,
-          strokeWidth: 2,
+          strokeWidth: render.width,
           strokeDasharray: style.dash,
+          opacity: render.opacity,
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
-        zIndex: e.type === 'subtask' ? 0 : 1,
+        zIndex: render.zIndex,
       }
     })
 
     return { flowNodes, flowEdges }
-  }, [taskNodes, taskEdges])
+  }, [taskNodes, taskEdges, hideInvalidated])
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => navigate(`/n/${node.id}`),
@@ -93,6 +134,15 @@ export function GraphPage() {
           ← Projects
         </Link>
         <h1>{project?.name ?? '…'}</h1>
+        <label className="graph-toggle">
+          <input
+            type="checkbox"
+            checked={hideInvalidated}
+            onChange={(e) => onToggleHideInvalidated(e.target.checked)}
+          />
+          Hide invalidated
+          <span className="graph-toggle-hint">(incl. inherited from ancestors)</span>
+        </label>
         <SearchBox projectId={projectId} />
       </div>
       {error ? <div className="form-error">{error}</div> : null}
