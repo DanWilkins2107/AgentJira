@@ -154,7 +154,7 @@ events (  -- append-only audit log
 
 ### RLS policy pattern
 
-- `projects`: select where member; insert where `created_by = auth.uid()`; update where member role `owner`. **`webhook_secret` is never exposed to the agent role** — simplest: a view or column privilege revoke for non-owners is overkill for v1; instead the web UI (owner) reads it, and the CLI never selects it.
+- `projects`: select where member **or creator** (`created_by = auth.uid()` — needed because `INSERT ... RETURNING` checks the select policy before the AFTER-INSERT bootstrap trigger has written the owner-membership row); insert where `created_by = auth.uid()`; update where member role `owner`. **`webhook_secret` is never exposed to the agent role** — simplest: a view or column privilege revoke for non-owners is overkill for v1; instead the web UI (owner) reads it, and the CLI never selects it.
 - All child tables (`nodes`, `edges`, `messages`): select/insert/update where `is_project_member(project_id)`. No delete policies (plus the raise-trigger belt-and-braces).
 - `events`: select/insert where member; no update/delete.
 - `project_members`: select where member; insert/update only by project owner (so the owner adds the agent user to each project by email/id from the web UI).
