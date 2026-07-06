@@ -11,6 +11,10 @@ import type { EventRow, MessageType, NodeStatus, TaskNode } from '../../lib/type
  * - split_proposed: approve → split_approved / reject → awaiting_agent_breakdown,
  *   both posting a split_decision message with the human's note.
  * - spec_review: approve → ready_for_pickup / reject → awaiting_agent_spec + required review_comment.
+ * - send back to breakdown (spec_review or awaiting_agent_spec): the node is too big for
+ *   one PR — rewind status → awaiting_agent_breakdown with a required explanation, so the
+ *   agent re-decides and can propose a split. First-class override for the fork the agent
+ *   took, replacing reliance on the manual "Advanced: set status" escape hatch.
  * - invalidate (dialog, required reason) → invalidate_node RPC.
  * - restore (dialog, invalidated nodes only): reverses an invalidation — sets status
  *   back to the pre-invalidation status (from events, human may override) and clears
@@ -114,6 +118,23 @@ export function ActionBar({
     })
   }
 
+  // Route a spec-stage node back to breakdown when it's too big for one PR.
+  // First-class override for the fork the agent already took — posts the
+  // explanation to the thread (review_comment at spec_review, note otherwise)
+  // and rewinds status to awaiting_agent_breakdown so the agent can re-decide.
+  async function sendToBreakdown() {
+    if (!note.trim()) {
+      setErr('Explain why this needs breaking down (posted to the thread).')
+      return
+    }
+    const type: MessageType = node.status === 'spec_review' ? 'review_comment' : 'note'
+    await run(async () => {
+      const msgErr = await postMessage(type, note.trim(), node.status)
+      if (msgErr) return msgErr
+      return setStatus('awaiting_agent_breakdown')
+    })
+  }
+
   async function invalidate() {
     if (!invalidateReason.trim()) return
     await run(async () => {
@@ -166,7 +187,10 @@ export function ActionBar({
     await run(() => setStatus(manualStatus))
   }
 
-  const needsNote = node.status === 'split_proposed' || node.status === 'spec_review'
+  const needsNote =
+    node.status === 'split_proposed' ||
+    node.status === 'spec_review' ||
+    node.status === 'awaiting_agent_spec'
 
   return (
     <div className="card action-bar">
@@ -178,7 +202,9 @@ export function ActionBar({
           placeholder={
             node.status === 'split_proposed'
               ? 'Note on the split decision (posted as a split_decision message)…'
-              : 'Review comment (required to reject)…'
+              : node.status === 'awaiting_agent_spec'
+                ? 'Why does this need breaking down? (posted as a note)…'
+                : 'Review comment (required to reject or send back to breakdown)…'
           }
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -224,9 +250,28 @@ export function ActionBar({
               style={promotedStyle}
               onClick={() => specDecision(false)}
             >
-              Reject spec
+              Reject → revise spec
+            </button>
+            <button
+              disabled={busy || !note.trim()}
+              className="btn-reject"
+              onClick={sendToBreakdown}
+              title="Too big for one PR — rewind to breakdown so the agent can split it"
+            >
+              Reject → break it down
             </button>
           </>
+        ) : null}
+
+        {node.status === 'awaiting_agent_spec' ? (
+          <button
+            disabled={busy || !note.trim()}
+            className="btn-reject"
+            onClick={sendToBreakdown}
+            title="Too big for one PR — rewind to breakdown so the agent can split it"
+          >
+            Too big — send back to breakdown
+          </button>
         ) : null}
 
         {node.claimed_by ? (

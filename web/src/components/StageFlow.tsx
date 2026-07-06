@@ -96,17 +96,21 @@ export function StageFlow({
 
   const splitTouched = SPLIT_STEPS.some((s) => visitedSet.has(s))
   const specTouched = SPEC_STEPS.some((s) => visitedSet.has(s))
-  const undecided = !splitTouched && !specTouched
+  // Back at the fork: a spec-stage node was sent back to breakdown, so the
+  // branch choice is open again regardless of history — re-show both futures.
+  const atOpenFork = node.status === 'awaiting_agent_breakdown'
+  const undecided = atOpenFork || (!splitTouched && !specTouched)
 
   // The rendered rail. Both branches touched (split then spec — legal): only the
   // split steps actually visited stay on the rail, then the spec branch.
   const rail: NodeStatus[] = useMemo(() => {
+    if (atOpenFork) return COMMON_STEPS // fork reopened: render both branches as futures
     if (splitTouched && specTouched)
       return [...COMMON_STEPS, ...SPLIT_STEPS.filter((s) => visitedSet.has(s)), ...SPEC_STEPS]
     if (splitTouched) return [...COMMON_STEPS, ...SPLIT_STEPS]
     if (specTouched) return [...COMMON_STEPS, ...SPEC_STEPS]
     return COMMON_STEPS // undecided: both branches rendered separately as dimmed futures
-  }, [splitTouched, specTouched, visitedSet])
+  }, [atOpenFork, splitTouched, specTouched, visitedSet])
 
   const offRail = node.status === 'awaiting_human_response' || node.status === 'invalidated'
   const currentIdx = offRail ? anchorIndex(rail, visited) : rail.indexOf(node.status)

@@ -17,7 +17,13 @@ Read the full dump **and the downloaded canvas PNGs** (the node's and its ancest
 
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
-**Decide: is this node already PR-sized?**
+**Decide: is this node already PR-sized?** Bias toward breaking down. Route straight
+to spec only when the node is *clearly* one coherent change — a title, a short body, and
+your own read all agree it's a single PR. If it's a freshly-created node with thin context
+(little body, no canvas braindump) or you're unsure of its size, **do not guess small**:
+propose a split, or ask a clarifying question first (`aj post <node> --type question …`).
+Skipping to spec on a hunch strands the human with no easy way back — prefer the split
+proposal, which they can approve or reject.
 
 - **PR-sized** (one coherent change, one PR): don't split. Route it to spec:
 
