@@ -57,7 +57,6 @@ export interface NodeRow {
   title: string;
   body: string;
   status: NodeStatus;
-  stale: boolean;
   is_vision: boolean;
   spec: string | null;
   pr_url: string | null;

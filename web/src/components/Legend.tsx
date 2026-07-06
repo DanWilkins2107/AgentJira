@@ -3,8 +3,8 @@ import { EDGE_TYPES, NODE_STATUSES } from '../lib/types'
 import type { NodeStatus } from '../lib/types'
 
 /** Mini card swatch that teaches the light/dark turn treatment. */
-function StatusSwatch({ status, inherited = false }: { status: NodeStatus; inherited?: boolean }) {
-  const treat = cardTreatment(status, inherited)
+function StatusSwatch({ status, stale = false }: { status: NodeStatus; stale?: boolean }) {
+  const treat = cardTreatment(status, stale)
   return (
     <span
       className="legend-swatch"
@@ -37,8 +37,9 @@ export function Legend() {
         </div>
       ))}
       <div className="legend-row">
-        <StatusSwatch status="broken_down" inherited />
-        <span className="legend-label">invalidated (inherited from ancestor)</span>
+        <StatusSwatch status="broken_down" stale />
+        <span className="legend-stale-badge-sample">STALE</span>
+        <span className="legend-label">stale (ancestor invalidated) — dead until restored</span>
       </div>
       <div className="legend-title" style={{ marginTop: 8 }}>
         Edges
@@ -64,10 +65,6 @@ export function Legend() {
           </div>
         )
       })}
-      <div className="legend-row">
-        <span className="legend-stale-badge-sample">STALE</span>
-        <span className="legend-label">stale (ancestor invalidated)</span>
-      </div>
       <div className="legend-row">
         <span className="legend-swatch-claimed" />
         <span className="legend-label">claimed by an agent</span>

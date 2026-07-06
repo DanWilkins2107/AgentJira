@@ -28,7 +28,9 @@ This document is the single source of truth for names, enums, schemas, and API s
 | `done` | none | Merged (or completed); `merge_sha` recorded |
 | `invalidated` | none | Marked wrong; `invalidation_reason` recorded; kept forever as context |
 
-Separate from status: `stale` (boolean flag — an ancestor was invalidated; premise needs re-checking) and `claimed_by`/`claimed_at` (an agent session is actively working the node — simple flag, human unsticks from UI).
+Separate from status: **stale** and `claimed_by`/`claimed_at` (an agent session is actively working the node — simple flag, human unsticks from UI).
+
+**Stale is derived-only, never persisted.** A node is **stale** iff its own status is NOT `invalidated` AND at least one ancestor via non-removed `subtask` edges (edge source = parent, target = child) has status `invalidated`. It is computed at read time everywhere (server-side: `stale_node_ids` / `node_context`; web graph derives the same set client-side). Stale nodes are dead until restored: they render with the invalidated treatment plus an amber STALE badge, are hidden by the graph's hide-toggle, and are excluded from the agent pickup list (`aj tasks`). Restoring the invalidated ancestor automatically un-stales the whole subtree — zero writes. "Invalidated" is reserved for nodes explicitly invalidated (persisted status + reason); stale is the one and only derived concept. Blocks never affect staleness — a blocker's status (including `invalidated`) is information served where blockers are listed, nothing more.
 
 Routing from `awaiting_agent_breakdown` is agent judgment: big → propose split; small enough → `aj set-status <id> awaiting_agent_spec` and write the spec.
 
@@ -49,7 +51,7 @@ No cycle enforcement anywhere. All graph traversals MUST carry a visited-set and
 
 ### `author_role` / actor role: `human` · `agent` · `system`
 
-## Database schema (Postgres, one migration `0001_init.sql`)
+## Database schema (Postgres, migrations in `supabase/migrations/`)
 
 All tables have RLS enabled. Extensions: `pgcrypto`.
 
@@ -80,7 +82,6 @@ nodes (
   title text not null check (char_length(title) between 1 and 300),
   body text not null default '',
   status node_status not null default 'human_braindump_needed',
-  stale boolean not null default false,
   is_vision boolean not null default false,
   spec text,
   pr_url text, pr_number integer, merge_sha text,
@@ -129,7 +130,10 @@ events (  -- append-only audit log
   actor_role text not null check (actor_role in ('human','agent','system')),
   type text not null,        -- e.g. node.created, node.status_changed, node.claimed,
                               --      node.invalidated, edge.created, message.posted,
-                              --      pr.opened, pr.merged, canvas.snapshot
+                              --      pr.opened, pr.merged, canvas.snapshot.
+                              --      node.marked_stale is HISTORICAL: no longer emitted
+                              --      since staleness became derived-only; old rows remain
+                              --      forever (history is sacred)
   data jsonb not null default '{}',
   created_at timestamptz not null default now()
 )
@@ -145,12 +149,13 @@ events (  -- append-only audit log
 
 ### RPCs (security invoker unless noted)
 
-- `invalidate_node(p_node uuid, p_reason text)` — sets `status='invalidated'`, `invalidation_reason`; then walks **descendants** (via non-removed `subtask` edges) and **firm-block targets**, recursively (visited-set, depth ≤ 50), setting `stale = true` on every node not already `done`/`invalidated`… including `done` ones getting `stale=true` too (a merged premise can still be stale). Logs `node.invalidated` + `node.marked_stale` events.
-  - **Invalidation semantics**: a node is **effectively invalidated** if its own status is `invalidated` OR any ancestor via non-removed `subtask` edges is invalidated. Inherited invalidation is derived at read time — nothing is written to descendants.
+- `invalidate_node(p_node uuid, p_reason text)` — sets `status='invalidated'`, `invalidation_reason`, and logs a `node.invalidated` event. That is all: nothing is marked or written on any other node (staleness is derived at read time), and no `node.marked_stale` event is emitted (that event type is historical). Blocks are never affected — a blocker's `invalidated` status is already visible wherever blockers are listed.
+  - **Stale semantics**: see the definition under the status table — descendants via non-removed `subtask` edges of an invalidated node read as **stale** (derived), full stop.
   - **Restore** (reverse an invalidation): update the node to its pre-invalidation status — default the `from` of the latest `node.status_changed` event with `to = 'invalidated'`, human may override — and set `invalidation_reason = null`. The update trigger logs the change; nothing is deleted.
-  - Restoring an ancestor automatically un-invalidates every descendant that was only inherited-invalidated. `stale` flags are NOT auto-cleared by a restore — premises still need re-checking.
+  - Restoring the node automatically un-stales every descendant that was stale because of it — staleness is derived, so the restore itself is the only write.
+- `stale_node_ids(p_project uuid) returns setof uuid` — the project's derived stale set: BFS down from every node with status `invalidated` via non-removed `subtask` edges (visited-set, depth ≤ 50); returns reachable node ids whose own status is not `invalidated`. Security invoker (RLS applies), `stable`.
 - `search_all(p_project uuid, p_query text)` — FTS (`websearch_to_tsquery`) over `nodes.fts` and `messages.fts`, returns unified rows `(kind, node_id, title, snippet, rank)`.
-- `node_context(p_node uuid)` — returns JSON: the node, its edges (both directions, incl. removed), ancestor chain via subtask edges up to the vision node (id, title, status, stale, invalidation_reason), children, and blockers with their statuses. Depth-capped, cycle-safe.
+- `node_context(p_node uuid)` — returns JSON: the node, its edges (both directions, incl. removed), ancestor chain via subtask edges up to the vision node (id, title, status, stale, invalidation_reason), children, and blockers with their statuses. Every `stale` field in the response is the DERIVED value (membership in `stale_node_ids`); the JSON field name `stale` is part of the contract. Depth-capped, cycle-safe.
 
 ### RLS policy pattern
 
@@ -207,8 +212,8 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 |---|---|
 | `aj whoami` | Current user + role |
 | `aj projects` | List member projects |
-| `aj tasks [-p <project>]` | Nodes in agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`), each annotated: stale flag, claimed_by, firm/soft blockers and blocker statuses. Firm-blocked-by-not-done and claimed-by-someone-else shown in a separate "not recommended" section, never hidden |
-| `aj context <node>` | Full context dump: node fields, spec, ancestor chain (statuses, stale, invalidation reasons), children, edges, all thread messages grouped by stage, blockers; downloads latest canvas PNGs of the node **and its ancestors** to a temp dir and prints the file paths (agents then Read the images) |
+| `aj tasks [-p <project>]` | Nodes in agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`), each annotated: claimed_by, firm/soft blockers and blocker statuses. **Stale nodes are excluded** (derived via `stale_node_ids` — dead until the invalidated ancestor is restored). Firm-blocked-by-not-done and claimed-by-someone-else shown in a separate "not recommended" section, never hidden |
+| `aj context <node>` | Full context dump: node fields, spec, ancestor chain (statuses, derived stale, invalidation reasons), children, edges, all thread messages grouped by stage, blockers; downloads latest canvas PNGs of the node **and its ancestors** to a temp dir and prints the file paths (agents then Read the images). Serves everything, including stale/invalidated nodes — that contract never changes |
 | `aj claim <node> [--session <label>]` / `aj unclaim <node>` | Set/clear `claimed_by` (default label `hostname:pid`); claim refuses (without `--force`) if already claimed |
 | `aj post <node> --type <message_type> --body <text> [--stage <status>]` | Post a message (stage defaults to node's current status). `--type question` also flips status → `awaiting_human_response` |
 | `aj propose-split <node> --body <text>` | Posts `split_proposal` message + status → `split_proposed` |
@@ -217,7 +222,7 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 | `aj submit-spec <node> (--file <path> \| --body <text>)` | Set `spec` + status → `spec_review`, post `spec_submission` message |
 | `aj set-status <node> <status>` | Direct status set (validated against enum) |
 | `aj link-pr <node> --url <u> --number <n>` | Set PR fields + status → `pr_raised` (backup for when the GHA isn't installed) |
-| `aj invalidate <node> --reason <text>` | Calls `invalidate_node` RPC |
+| `aj invalidate <node> --reason <text>` | Calls `invalidate_node` RPC (descendants become stale — derived — until this node is restored; blocks unaffected) |
 | `aj search -p <project> <query>` | `search_all` RPC results |
 
 Errors: nonzero exit + one-line message. Never swallow Supabase errors.
@@ -228,7 +233,7 @@ Vite + React 18 + TypeScript strict + `react-router-dom` + `@supabase/supabase-j
 
 Routes: `/login` · `/` (projects list + create; owner can add agent member by user id/email; shows repo + webhook secret setup with GHA install instructions) · `/p/:projectId` (graph) · `/n/:nodeId` (node detail).
 
-**Graph view**: dagre top-to-bottom layout over non-removed `subtask` + `firm_block` + `soft_block` edges (vision at top), weighted so hierarchy dominates — subtask weight 4, firm_block 2, soft_block 1 — which ranks a blocker above what it blocks, so block edges flow top-to-bottom instead of sideways; `relates_to` stays out of layout. All non-removed edges are rendered as bezier curves — `subtask` gray (thinner, faded scaffolding), `firm_block` solid red, `soft_block` dashed amber, `relates_to` dotted gray (faint). Cycle-safe, depth-capped traversal; back-edges are dropped from LAYOUT only and still rendered. Node cards encode turn by brightness: human-turn statuses render as light/bright status-colored cards with dark text, agent-turn as dark cards with the status color as border + left accent bar, github/none dark and muted. Descendants of an invalidated node (via non-removed `subtask` edges) render with the invalidated treatment and an "Invalidated (inherited)" pill — derived in the view, never persisted, so restoring the ancestor restores them automatically. A "Hide invalidated" toolbar toggle (default off, persisted per project in localStorage) filters effectively-invalidated nodes and re-runs layout — a human-view convenience only; agents are always served invalidated context. Legend always visible (teaches the light/dark treatment, edge styles, and badges). Live-ish via supabase realtime subscription or refetch-on-focus (either fine).
+**Graph view**: dagre top-to-bottom layout over non-removed `subtask` + `firm_block` + `soft_block` edges (vision at top), weighted so hierarchy dominates — subtask weight 4, firm_block 2, soft_block 1 — which ranks a blocker above what it blocks, so block edges flow top-to-bottom instead of sideways; `relates_to` stays out of layout. All non-removed edges are rendered as bezier curves — `subtask` gray (thinner, faded scaffolding), `firm_block` solid red, `soft_block` dashed amber, `relates_to` dotted gray (faint). Cycle-safe, depth-capped traversal; back-edges are dropped from LAYOUT only and still rendered. Node cards encode turn by brightness: human-turn statuses render as light/bright status-colored cards with dark text, agent-turn as dark cards with the status color as border + left accent bar, github/none dark and muted. Descendants of an invalidated node (via non-removed `subtask` edges) are **stale**: they render with the invalidated treatment (dimmed) plus the amber STALE badge while the pill keeps the node's own status label — derived in the view, never persisted, so restoring the ancestor un-stales them automatically. A "Hide invalidated & stale" toolbar toggle (default off, persisted per project in localStorage) filters invalidated + stale nodes and re-runs layout — a human-view convenience only; agents are always served invalidated context. When the toggle hides every node, an empty-state message is shown over the canvas instead of a blank graph. Legend always visible (teaches the light/dark treatment, edge styles, and badges). Live-ish via supabase realtime subscription or refetch-on-focus (either fine).
 
 **Status colors** (the "brighter = human needed" rule, use everywhere incl. legend and node detail):
 
@@ -247,9 +252,9 @@ Routes: `/login` · `/` (projects list + create; owner can add agent member by u
 | `done` | muted green `#40c057` at 70% |
 | `invalidated` | gray `#868e96` |
 
-`stale = true` → amber `#f59f00` STALE corner badge (solid, top-right; dashed amber is reserved for `soft_block` edges). `claimed_by` set → pulsing dot badge.
+Stale (derived — ancestor currently invalidated) → amber `#f59f00` STALE corner badge (solid, top-right; dashed amber is reserved for `soft_block` edges) on top of the invalidated card treatment. `claimed_by` set → pulsing dot badge.
 
-**Node detail**: a **stage-flow stepper** at the top renders the whole canonical pipeline (`human_braindump_needed` → `awaiting_agent_breakdown` → fork: split path `split_proposed` → `split_approved` → `broken_down`, or spec path `awaiting_agent_spec` → `spec_review` → `ready_for_pickup` → `pr_raised` → `done`), marking each step visited / current / skipped / future from the node's `node.status_changed` events; `awaiting_human_response` and `invalidated` render as off-rail chips (invalidated dims the rail). The stepper carries the single primary **next button** for the current status (braindump done → `awaiting_agent_breakdown`; answered → back to the status the question interrupted) or a cue pointing at the promoted Approve/Reject buttons; agent-turn, GitHub, and terminal statuses show a hint instead. Status pill + turn indicator; action buttons contextual to status (approve/reject split → sets `split_approved` / back to `awaiting_agent_breakdown` with a `split_decision` message; approve/reject spec → `ready_for_pickup` / `awaiting_agent_spec` + `review_comment`; invalidate with required reason → RPC; **restore** on invalidated nodes → back to the pre-invalidation status from events, human may override, clearing `invalidation_reason`; unclaim; manual set-status demoted into a collapsed "Advanced" escape hatch). Markdown body editor (plain textarea + save is fine). Tabs or sections: **Canvas** (tldraw; on save, persist `tldraw_doc` and export PNG → storage → update `canvas_png_path`, log `canvas.snapshot` event), **Threads** (messages grouped by `stage`, newest stage first, composer posts to current stage), **History** (events timeline, rendered readably), **Edges** (list + add-edge form + remove sets `removed_at`), **Spec/PR** (spec markdown, PR link out). Header breadcrumb: ancestor chain, each link colored by status, stale/invalidated ancestors visibly flagged — this is the "descendant of dead premise" warning.
+**Node detail**: a **stage-flow stepper** at the top renders the whole canonical pipeline (`human_braindump_needed` → `awaiting_agent_breakdown` → fork: split path `split_proposed` → `split_approved` → `broken_down`, or spec path `awaiting_agent_spec` → `spec_review` → `ready_for_pickup` → `pr_raised` → `done`), marking each step visited / current / skipped / future from the node's `node.status_changed` events; `awaiting_human_response` and `invalidated` render as off-rail chips (invalidated dims the rail). The stepper carries the single primary **next button** for the current status (braindump done → `awaiting_agent_breakdown`; answered → back to the status the question interrupted) or a cue pointing at the promoted Approve/Reject buttons; agent-turn, GitHub, and terminal statuses show a hint instead. Status pill + turn indicator; action buttons contextual to status (approve/reject split → sets `split_approved` / back to `awaiting_agent_breakdown` with a `split_decision` message; approve/reject spec → `ready_for_pickup` / `awaiting_agent_spec` + `review_comment`; invalidate with required reason → RPC; **restore** on invalidated nodes → back to the pre-invalidation status from events, human may override, clearing `invalidation_reason` — descendants un-stale automatically, nothing else is written; unclaim; manual set-status demoted into a collapsed "Advanced" escape hatch). Markdown body editor (plain textarea + save is fine). Tabs or sections: **Canvas** (tldraw; on save, persist `tldraw_doc` and export PNG → storage → update `canvas_png_path`, log `canvas.snapshot` event), **Threads** (messages grouped by `stage`, newest stage first, composer posts to current stage), **History** (events timeline, rendered readably), **Edges** (list + add-edge form + remove sets `removed_at`), **Spec/PR** (spec markdown, PR link out). Header breadcrumb: ancestor chain, each link colored by status, stale/invalidated ancestors visibly flagged — this is the "descendant of dead premise" warning.
 
 Search box (project level) → `search_all`, results link to nodes.
 
@@ -271,5 +276,5 @@ Plugin README explains install (`/plugin` marketplace-from-dir or `--plugin-dir`
 1. Exact enum strings from this file.
 2. No hard deletes, ever.
 3. Graph traversals: visited-set + depth cap 50 (cycles are legal data).
-4. Agents get invalidated/stale context served to them, never filtered out.
+4. Agents get invalidated/stale context served to them, never filtered out (`aj context` serves everything; only the `aj tasks` pickup list excludes stale nodes — they are not actionable, not hidden context).
 5. Secrets: webhook secret only in GHA repo secrets + `projects` row; anon key is public by design; service-role key only inside the Edge Function.

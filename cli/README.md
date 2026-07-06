@@ -81,9 +81,11 @@ aj projects
 
 ### `aj tasks [-p <project>] [--session <label>]`
 
-Nodes in the four agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`. Each task is annotated with its stale flag, claim, and every non-removed `firm_block`/`soft_block` edge targeting it (blocker title + status).
+Nodes in the four agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block` edge targeting it (blocker title + status).
 
-Two sections — nothing is ever hidden:
+**Stale** nodes — an ancestor via subtask edges is currently `invalidated` (derived at read time via the `stale_node_ids` RPC, never stored) — are excluded entirely: they are dead until the invalidated ancestor is restored, at which point they reappear automatically. `aj context` still serves them in full.
+
+Two sections — nothing actionable is ever hidden:
 
 - **RECOMMENDED** — pickable now. Soft-blocked tasks stay here but carry a visible soft-block warning (pick up only if nothing better to do).
 - **NOT RECOMMENDED** — firm-blocked by a not-`done` blocker, or claimed by someone else; the reason is printed.
@@ -99,8 +101,8 @@ aj tasks --json
 
 Everything an agent needs before working a node:
 
-- the node's fields, body, spec, PR link — with **loud** `!! STALE` / `!! INVALIDATED: <reason>` warnings,
-- ancestor chain up to the vision node (statuses, stale flags, invalidation reasons),
+- the node's fields, body, spec, PR link — with **loud** `!! STALE` / `!! INVALIDATED: <reason>` warnings (stale is derived server-side: an ancestor is currently invalidated),
+- ancestor chain up to the vision node (statuses, derived stale flags, invalidation reasons),
 - children, blockers, and all edges (including removed ones),
 - **all thread messages grouped by stage**,
 - the latest canvas PNG of the node **and each ancestor** that has one, downloaded to `<os-tmpdir>/agentjira/<node-id>/<owner-node-id>.png` — the local file paths are printed prominently. **Read those image files**; canvases are primary context.
@@ -183,7 +185,7 @@ aj link-pr 3f2a1b --url https://github.com/dan/my-app/pull/7 --number 7
 
 ### `aj invalidate <node> --reason <text>`
 
-Calls the `invalidate_node` RPC: sets `invalidated` + the reason, and marks descendants and firm-block targets stale. Invalidated nodes are permanent, first-class context.
+Calls the `invalidate_node` RPC: sets `invalidated` + the reason. Subtask descendants become **stale** — derived at read time, nothing is written to them — until this node is restored (restoring un-stales the whole subtree automatically). Firm-block targets are NOT affected; a blocker's status is already visible where blockers are listed. Invalidated nodes are permanent, first-class context.
 
 ```sh
 aj invalidate 3f2a1b --reason "We switched to magic links; password flow is obsolete"

@@ -4,7 +4,7 @@ An opinionated Jira alternative where AI agents and humans collaborate on work. 
 
 Humans and agents **alternate turns**, and the node's status always says whose turn it is. Regular human intervention is a feature, not a failure mode: humans approve every split, every spec, and every PR (the GitHub review is the final gate — a GitHub Action then merges and flips the node to done). Agents work through the `aj` CLI from Claude Code sessions; the board itself never calls an LLM — it is a coordination surface, not an actor.
 
-History is **permanent and searchable**. Nothing is ever deleted: when a premise turns out wrong, its node is invalidated with a recorded reason and its descendants are flagged stale. Invalidated nodes aren't trash — they are vital context that stops the next agent from repeating the mistake.
+History is **permanent and searchable**. Nothing is ever deleted: when a premise turns out wrong, its node is invalidated with a recorded reason and its descendants read as **stale** — derived at read time, nothing written to them — until the invalidated node is restored (restoring un-stales the whole subtree automatically). Invalidated nodes aren't trash — they are vital context that stops the next agent from repeating the mistake.
 
 > **Name**: "AgentJira" is a working codename only — this project is not affiliated with Atlassian, and "Jira" is their trademark. It gets renamed before any public release.
 
@@ -47,7 +47,7 @@ Set up each piece in order — each README hands off to the next:
 | `done` | muted green at 70% | `#40c057` |
 | `invalidated` | gray | `#868e96` |
 
-Plus: a dashed amber ring means `stale` (an ancestor was invalidated); a pulsing dot means an agent has the node claimed.
+Plus: a solid amber STALE badge means the node is stale (an ancestor is currently invalidated — derived, and cleared automatically when the ancestor is restored); a pulsing dot means an agent has the node claimed.
 
 ## Learn more
 

@@ -25,7 +25,6 @@ interface TaskEntry {
   project_name: string | null;
   title: string;
   status: NodeStatus;
-  stale: boolean;
   claimed_by: string | null;
   claimed_at: string | null;
   blockers: BlockerInfo[];
@@ -37,7 +36,6 @@ interface TaskNodeRow {
   project_id: string;
   title: string;
   status: NodeStatus;
-  stale: boolean;
   claimed_by: string | null;
   claimed_at: string | null;
 }
@@ -46,7 +44,7 @@ export function registerTasks(program: Command): void {
   program
     .command('tasks')
     .description(
-      `List nodes in agent-turn statuses (${AGENT_TURN_STATUSES.join(', ')}), with stale/claim/blocker annotations`,
+      `List actionable nodes in agent-turn statuses (${AGENT_TURN_STATUSES.join(', ')}), with claim/blocker annotations. Stale nodes (ancestor currently invalidated) are excluded — they are dead until the ancestor is restored`,
     )
     .option('-p, --project <project>', 'limit to one project (uuid, id prefix, or exact name)')
     .option(
@@ -61,13 +59,27 @@ export function registerTasks(program: Command): void {
 
         let query = sb
           .from('nodes')
-          .select('id, project_id, title, status, stale, claimed_by, claimed_at')
+          .select('id, project_id, title, status, claimed_by, claimed_at')
           .in('status', [...AGENT_TURN_STATUSES])
           .order('created_at', { ascending: true });
         if (projectId) query = query.eq('project_id', projectId);
         const { data, error } = await query;
         if (error) throw new CliError(error.message);
-        const nodes = (data ?? []) as TaskNodeRow[];
+        let nodes = (data ?? []) as TaskNodeRow[];
+
+        // Derived stale (an ancestor is currently invalidated) per project via
+        // the stale_node_ids RPC. Stale nodes are dead until the ancestor is
+        // restored — never actionable, so they are excluded entirely.
+        const staleIds = new Set<string>();
+        const taskProjectIds = [...new Set(nodes.map((n) => n.project_id))];
+        for (const pid of taskProjectIds) {
+          const { data: staleData, error: staleErr } = await sb.rpc('stale_node_ids', {
+            p_project: pid,
+          });
+          if (staleErr) throw new CliError(`stale_node_ids RPC failed: ${staleErr.message}`);
+          for (const id of (staleData ?? []) as string[]) staleIds.add(id);
+        }
+        nodes = nodes.filter((n) => !staleIds.has(n.id));
 
         // Project names for annotation.
         const { data: projData, error: projErr } = await sb.from('projects').select('id, name');
@@ -141,7 +153,6 @@ export function registerTasks(program: Command): void {
             project_name: projectNames.get(n.project_id) ?? null,
             title: n.title,
             status: n.status,
-            stale: n.stale,
             claimed_by: n.claimed_by,
             claimed_at: n.claimed_at,
             blockers,
@@ -168,7 +179,6 @@ export function registerTasks(program: Command): void {
 
 function printTask(t: TaskEntry, ownLabel: string | null): void {
   const flags: string[] = [];
-  if (t.stale) flags.push('!! STALE');
   if (t.claimed_by !== null && t.claimed_by === ownLabel) flags.push(`claimed by you (${t.claimed_by})`);
   const proj = t.project_name ? `  {${t.project_name}}` : '';
   console.log(

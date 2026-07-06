@@ -45,7 +45,8 @@ export function statusRgba(status: NodeStatus, alpha = 1): string {
   return `rgba(${r}, ${g}, ${b}, ${meta.alpha * alpha})`
 }
 
-/** Amber for the solid "STALE" corner badge when stale=true. */
+/** Amber for the solid "STALE" corner badge (stale = derived: an ancestor is
+ * currently invalidated — never persisted). */
 export const STALE_BADGE = '#f59f00'
 
 const DARK_CARD_BG = '#1f2226'
@@ -74,12 +75,13 @@ export interface CardTreatment {
 }
 
 /**
- * Card treatment for a status. Pass `inheritedInvalid` when the node's own
- * status isn't `invalidated` but an ancestor's is — it renders with the
- * invalidated treatment (derived, never persisted).
+ * Card treatment for a status. Pass `stale` when the node's own status isn't
+ * `invalidated` but an ancestor's currently is — the node renders with the
+ * invalidated treatment (derived, never persisted; it springs back when the
+ * ancestor is restored).
  */
-export function cardTreatment(status: NodeStatus, inheritedInvalid = false): CardTreatment {
-  if (status === 'invalidated' || inheritedInvalid) {
+export function cardTreatment(status: NodeStatus, stale = false): CardTreatment {
+  if (status === 'invalidated' || stale) {
     return {
       background: DARK_MUTED_CARD_BG,
       borderColor: statusRgba('invalidated', 0.6),

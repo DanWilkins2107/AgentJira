@@ -8,9 +8,12 @@ const DEPTH_CAP = 50
  * non-removed `subtask` edges (BFS, visited set, depth cap 50 — cycles are
  * legal data).
  *
- * This is DERIVED, view-layer state only — it is never persisted. That's the
- * point: restoring an invalidated ancestor automatically un-dims all of its
- * descendants with no writes needed.
+ * A node is **stale** iff it is in this set AND its own status is not
+ * `invalidated` — i.e. an ancestor is currently invalidated. Stale is DERIVED
+ * everywhere, never persisted (the server-side equivalent is the
+ * `stale_node_ids` RPC). That's the point: restoring the invalidated ancestor
+ * automatically un-stales the whole subtree with zero writes. Blocks never
+ * affect staleness.
  */
 export function effectivelyInvalidated(nodes: TaskNode[], edges: NodeEdge[]): Set<string> {
   const children = new Map<string, string[]>()

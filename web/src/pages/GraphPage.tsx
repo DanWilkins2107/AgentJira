@@ -74,8 +74,9 @@ export function GraphPage() {
   }, [load])
 
   const { flowNodes, flowEdges } = useMemo(() => {
-    // Derived, never persisted: descendants of invalidated nodes read as
-    // invalidated too, and come back automatically if the ancestor is restored.
+    // Derived, never persisted: subtask descendants of an invalidated node are
+    // STALE — they render dimmed with a badge and come back automatically when
+    // the ancestor is restored.
     const invalidSet = effectivelyInvalidated(taskNodes, taskEdges)
 
     const visibleNodes = hideInvalidated
@@ -95,7 +96,7 @@ export function GraphPage() {
       id: n.id,
       type: 'task',
       position: positions.get(n.id) ?? { x: 0, y: 0 },
-      data: { task: n, inheritedInvalid: invalidSet.has(n.id) && n.status !== 'invalidated' },
+      data: { task: n, stale: invalidSet.has(n.id) && n.status !== 'invalidated' },
     }))
 
     const flowEdges: FlowEdge[] = visibleEdges.map((e) => {
@@ -120,6 +121,9 @@ export function GraphPage() {
     return { flowNodes, flowEdges }
   }, [taskNodes, taskEdges, hideInvalidated])
 
+  // The toggle can hide every node; say so instead of showing a blank canvas.
+  const allHidden = taskNodes.length > 0 && flowNodes.length === 0
+
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => navigate(`/n/${node.id}`),
     [navigate],
@@ -140,13 +144,19 @@ export function GraphPage() {
             checked={hideInvalidated}
             onChange={(e) => onToggleHideInvalidated(e.target.checked)}
           />
-          Hide invalidated
-          <span className="graph-toggle-hint">(incl. inherited from ancestors)</span>
+          Hide invalidated &amp; stale
+          <span className="graph-toggle-hint">(stale = an ancestor is invalidated)</span>
         </label>
         <SearchBox projectId={projectId} />
       </div>
       {error ? <div className="form-error">{error}</div> : null}
       <div className="graph-canvas">
+        {allHidden ? (
+          <div className="graph-empty-state">
+            All {taskNodes.length} node{taskNodes.length === 1 ? ' is' : 's are'} invalidated or
+            stale — hidden by the filter. Untick “Hide invalidated &amp; stale” to see them.
+          </div>
+        ) : null}
         <ReactFlow
           nodes={flowNodes}
           edges={flowEdges}
