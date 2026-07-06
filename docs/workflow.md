@@ -45,7 +45,7 @@ stateDiagram-v2
     end note
 ```
 
-Orthogonal to status: `stale` (an ancestor was invalidated; premise needs re-checking) and `claimed_by` (an agent session is actively on it; humans clear stuck claims from the UI).
+Orthogonal to status: **stale** (derived at read time, never stored — an ancestor via subtask edges is currently `invalidated`; the node is dead until that ancestor is restored) and `claimed_by` (an agent session is actively on it; humans clear stuck claims from the UI).
 
 ## The breakdown loop
 
@@ -107,17 +107,17 @@ Post-merge, nothing auto-advances: dependents' "unblocked" state is derived from
 
 ## Invalidation and staleness
 
-When a premise turns out wrong, the node is **invalidated** (reason required, recorded forever). Everything built on it gets flagged `stale`:
+When a premise turns out wrong, the node is **invalidated** (reason required, recorded forever). Everything built on it reads as **stale** — derived at read time, nothing is written to the descendants:
 
 ```mermaid
 flowchart TD
-    inv[invalidate node<br/>reason recorded] --> desc[descendants via subtask edges<br/>stale = true]
-    inv --> fb[firm_block targets<br/>stale = true]
-    desc --> recheck[premise re-checked by human or agent]
-    fb --> recheck
-    recheck --> norm[norm - invalidate stale work<br/>and recreate fresh nodes]
+    inv[invalidate node<br/>reason recorded, status = invalidated] --> desc[descendants via subtask edges<br/>read as STALE - derived, no writes]
+    desc --> dead[stale = dead until restored:<br/>dimmed in the graph, hidden by the hide-toggle,<br/>excluded from aj tasks]
+    dead --> restore[restore the invalidated ancestor]
+    restore --> undo[whole subtree un-stales automatically<br/>zero writes]
 ```
 
-- The walk is recursive over non-removed `subtask` edges and `firm_block` targets, cycle-safe, depth-capped at 50. Even `done` nodes get `stale = true` — a merged premise can still be stale.
-- `stale` renders as a dashed amber ring; invalidated ancestors are flagged in every descendant's breadcrumb.
+- A node is stale iff its own status is not `invalidated` and an ancestor via non-removed `subtask` edges currently is. The walk (server: `stale_node_ids`; web: derived in the view) is cycle-safe and depth-capped at 50. Even `done` descendants read as stale — a merged premise can still be stale.
+- **Blocks never affect staleness.** A blocker's status (including `invalidated`) is visible wherever blockers are listed; that's the whole signal.
+- Stale renders as the dimmed invalidated card treatment plus a solid amber STALE badge; invalidated ancestors are flagged in every descendant's breadcrumb.
 - **Invalidated nodes are not trash.** They stay first-class, readable, and searchable — the invalidation reason is exactly the context that stops the next agent repeating the mistake. Nothing is ever deleted.

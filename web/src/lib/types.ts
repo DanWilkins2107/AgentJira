@@ -79,7 +79,6 @@ export interface TaskNode {
   title: string
   body: string
   status: NodeStatus
-  stale: boolean
   is_vision: boolean
   spec: string | null
   pr_url: string | null
@@ -138,7 +137,9 @@ export interface SearchResult {
   rank: number
 }
 
-// node_context RPC shape
+// node_context RPC shape. `stale` here is DERIVED server-side (an ancestor
+// via non-removed subtask edges is currently invalidated) — it is not a
+// nodes-table column. The JSON field name is part of the contract.
 export interface AncestorInfo {
   id: string
   title: string
@@ -150,10 +151,12 @@ export interface AncestorInfo {
   depth: number
 }
 
+export type ContextNode = TaskNode & { stale: boolean }
+
 export interface NodeContext {
-  node: TaskNode
+  node: ContextNode
   edges: NodeEdge[]
   ancestors: AncestorInfo[]
-  children: TaskNode[]
-  blockers: TaskNode[]
+  children: ContextNode[]
+  blockers: ContextNode[]
 }

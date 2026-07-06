@@ -48,7 +48,7 @@ Edges of type `firm_block` and `soft_block` are **information for you, never har
 
 **ALWAYS run `aj context <node>` before working a node** — no exceptions. It dumps the node, spec, ancestor chain, children, edges, blockers, and all thread messages, and it downloads the latest canvas PNGs of the node **and its ancestors** to a temp dir, printing the file paths. **Read those PNG files** (with the Read tool) — canvases carry human intent that the text does not.
 
-- **Invalidated and stale ancestors are vital context, never noise.** An `invalidated` ancestor's `invalidation_reason` tells you what was tried and why it was wrong. A `stale` flag means an ancestor was invalidated and this node's premise needs re-checking — verify the premise before building on it.
+- **Invalidated and stale ancestors are vital context, never noise.** An `invalidated` ancestor's `invalidation_reason` tells you what was tried and why it was wrong. **Stale** is derived, never stored: it means an ancestor is *currently* invalidated, and the node is dead until that ancestor is restored — stale nodes never appear in `aj tasks`, and restoring the ancestor un-stales them automatically. Do not work a stale node unless a human explicitly directs you to. Blockers don't cause staleness — a blocker's status (including `invalidated`) is information to weigh, shown in the blockers list.
 - Use `aj search -p <project> <query>` to pull related history from elsewhere in the graph; everything ever written (including invalidated nodes) is searchable on purpose.
 
 ## Ask early, don't guess

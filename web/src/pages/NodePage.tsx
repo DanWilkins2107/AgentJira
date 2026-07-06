@@ -108,38 +108,35 @@ export function NodePage() {
 
   const meta = STATUS_META[node.status]
   const ancestors = context?.ancestors ?? []
-  // Effective invalidation is derived at read time, never persisted: a node is
-  // effectively invalidated if its own status is 'invalidated' OR any ancestor
-  // (via non-removed subtask edges — what node_context walks) is invalidated.
-  // Restoring the ancestor therefore un-invalidates every descendant automatically.
+  // Stale is derived at read time, never persisted: a node is stale iff its
+  // own status is not 'invalidated' and an ancestor via non-removed subtask
+  // edges (what node_context walks) currently is. The `stale` fields below are
+  // served by node_context — the nodes table has no stale column. Restoring
+  // the ancestor un-stales every descendant automatically, with zero writes.
   const invalidatedAncestors = ancestors.filter((a) => a.status === 'invalidated')
-  const staleAncestors = ancestors.filter((a) => a.stale && a.status !== 'invalidated')
-  const inheritedInvalidated = invalidatedAncestors.length > 0
-  const effectivelyInvalidated = node.status === 'invalidated' || inheritedInvalidated
+  const isStale = (context?.node.stale ?? invalidatedAncestors.length > 0) && node.status !== 'invalidated'
+  const deadNode = node.status === 'invalidated' || isStale
 
   return (
     <div className="page node-page">
       <Breadcrumb ancestors={ancestors} node={node} />
 
-      {invalidatedAncestors.map((a) => (
-        <div key={a.id} className="banner banner-danger banner-inherited-invalid">
-          ✕ This node is <strong>INVALIDATED</strong> (inherited from ancestor{' '}
-          <Link to={`/n/${a.id}`}>“{a.title}”</Link>
-          {a.invalidation_reason ? <>: “{a.invalidation_reason}”</> : null}). Restoring that
-          ancestor restores this node.
-        </div>
-      ))}
-      {staleAncestors.map((a) => (
-        <div key={a.id} className="banner banner-warn">
-          ⚠ Ancestor <Link to={`/n/${a.id}`}>{a.title}</Link> is <strong>stale</strong> — its
-          premise needs re-checking.
-        </div>
-      ))}
-      {node.stale ? (
+      {isStale && invalidatedAncestors.length === 0 ? (
         <div className="banner banner-warn">
-          ⚠ This node is <strong>stale</strong>: an ancestor was invalidated; re-check the premise.
+          ⚠ This node is <strong>STALE</strong>: an ancestor is currently invalidated. It is dead
+          until that ancestor is restored.
         </div>
       ) : null}
+      {node.status !== 'invalidated'
+        ? invalidatedAncestors.map((a) => (
+            <div key={a.id} className="banner banner-warn">
+              ⚠ This node is <strong>STALE</strong>: ancestor{' '}
+              <Link to={`/n/${a.id}`}>“{a.title}”</Link> is invalidated
+              {a.invalidation_reason ? <> (“{a.invalidation_reason}”)</> : null}. Nothing was
+              written to this node — restoring that ancestor un-stales it automatically.
+            </div>
+          ))
+        : null}
       {node.status === 'invalidated' ? (
         <div className="banner banner-danger">
           ✕ Invalidated{node.invalidation_reason ? <>: “{node.invalidation_reason}”</> : null} — use
@@ -148,30 +145,25 @@ export function NodePage() {
       ) : null}
 
       <div className="node-head">
-        <h1 className={effectivelyInvalidated ? 'node-title-invalidated' : undefined}>
+        <h1 className={deadNode ? 'node-title-invalidated' : undefined}>
           {node.is_vision ? <span className="task-node-vision">★ </span> : null}
           {node.title}
         </h1>
         <div className="node-head-status">
-          <StatusPill status={node.status} />
-          {inheritedInvalidated && node.status !== 'invalidated' ? (
+          {/* Own status label stays visible (dimmed when stale) so the story isn't lost. */}
+          <span style={{ opacity: isStale ? 0.55 : 1 }}>
+            <StatusPill status={node.status} />
+          </span>
+          {isStale ? (
             <>
               <span
-                className="status-pill"
-                style={{
-                  backgroundColor: statusRgba('invalidated', 0.18),
-                  border: `1.5px solid ${statusRgba('invalidated')}`,
-                }}
-                title="Derived from an invalidated ancestor — nothing was written to this node"
+                className="crumb-flag crumb-flag-stale"
+                title="Derived: an ancestor is currently invalidated — nothing was written to this node"
               >
-                <span
-                  className="status-pill-dot"
-                  style={{ backgroundColor: statusRgba('invalidated') }}
-                />
-                Invalidated (inherited)
+                STALE
               </span>
               <span className="muted" style={{ fontSize: 12 }}>
-                stored status preserved — springs back when the ancestor is restored
+                own status preserved — un-stales when the ancestor is restored
               </span>
             </>
           ) : (

@@ -272,9 +272,9 @@ export function ActionBar({
             <h3>Restore node</h3>
             <p className="muted">
               Reverses the invalidation: sets the status back (default = the status it had before
-              being invalidated) and clears the reason. Descendants that were only
-              inherited-invalidated come back automatically. <code>stale</code> flags on descendants
-              are NOT auto-cleared — their premises still need re-checking. Nothing is deleted.
+              being invalidated) and clears the reason. Every descendant that was stale because of
+              this node automatically stops being stale — staleness is derived, so nothing is
+              written or deleted anywhere.
             </p>
             <label>
               Restore to status
@@ -312,8 +312,9 @@ export function ActionBar({
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Invalidate node</h3>
             <p className="muted">
-              The node stays forever as context; descendants and firm-block targets are marked stale.
-              A reason is required.
+              The node stays forever as context. Its subtask descendants become{' '}
+              <strong>stale</strong> (derived — nothing is written to them) until this node is
+              restored. Blocked nodes are NOT affected. A reason is required.
             </p>
             <textarea
               autoFocus

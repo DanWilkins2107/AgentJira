@@ -19,7 +19,7 @@ aj claim <node>
 aj context <node>
 ```
 
-Read the spec, the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check stale/invalidated ancestors — if the node is `stale`, verify the spec's premise still holds before writing code; if it doesn't, ask (`aj post <node> --type question --body "..."`) instead of implementing a dead premise.
+Read the spec, the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
 
 ## 3. Branch
 

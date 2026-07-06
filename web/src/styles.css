@@ -287,6 +287,21 @@ label {
 .graph-canvas {
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+/* Overlaid when the hide-toggle filters out every node — never a blank graph. */
+.graph-empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 15px;
+  pointer-events: none;
 }
 .graph-toggle {
   flex-direction: row;

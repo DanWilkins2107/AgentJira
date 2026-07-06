@@ -141,9 +141,12 @@ function printHuman(
       `PR:      ${node.pr_url}${node.pr_number !== null ? ` (#${node.pr_number})` : ''}${node.merge_sha ? `  merge_sha=${node.merge_sha}` : ''}`,
     );
   }
-  if (node.stale) {
+  // Stale is derived server-side by node_context (an ancestor is currently
+  // invalidated); it is not a nodes-table column.
+  const ctxNode = isObj(context['node']) ? context['node'] : {};
+  if (ctxNode['stale'] === true) {
     console.log(
-      '!! STALE — an ancestor was invalidated; re-verify this node\'s premise before working on it',
+      '!! STALE — an ancestor is currently invalidated; this node is dead until that ancestor is restored',
     );
   }
   if (node.status === 'invalidated' || node.invalidation_reason) {

@@ -13,7 +13,7 @@ Follow the `agentjira-workflow` rulebook throughout. Claim the node first (`aj c
 aj context <node>
 ```
 
-Read the full dump **and the downloaded canvas PNGs** (the node's and its ancestors') — the human's braindump often lives on the canvas. Check invalidated/stale ancestors: their reasons tell you which directions are already dead. If the direction is unclear, ask now (`aj post <node> --type question --body "..."`) rather than proposing a split built on guesses.
+Read the full dump **and the downloaded canvas PNGs** (the node's and its ancestors') — the human's braindump often lives on the canvas. Check invalidated ancestors: their reasons tell you which directions are already dead (a **stale** node — ancestor currently invalidated — is itself dead until that ancestor is restored). If the direction is unclear, ask now (`aj post <node> --type question --body "..."`) rather than proposing a split built on guesses.
 
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
