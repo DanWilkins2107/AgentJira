@@ -57,12 +57,20 @@ The human approved the proposal (read the thread — their `split_decision` mess
 
    This creates the node plus the `subtask` edge from the parent. Default status `awaiting_agent_breakdown` is correct — children that are obviously PR-sized can be created with `--status awaiting_agent_spec` instead.
 
-2. Add the proposed sibling blocks:
+2. Add the proposed **sibling** blocks — only blocks _between the new children_:
 
    ```
    aj add-edge --type firm_block --from <blocker-child> --to <blocked-child>
    aj add-edge --type soft_block --from <blocker-child> --to <blocked-child>
    ```
+
+   **Do NOT replicate the parent's outside blocks onto each child.** If the parent
+   blocks some outside node T, that block stays on the parent — once you set the
+   parent `broken_down` (step 3) it becomes a *coarse* block: hidden from the graph
+   and surfaced in `aj context` as a parent-level note, so the outside dependency
+   isn't lost. Fanning "child₁→T, child₂→T, child₃→T" just recreates the hairball the
+   coarse-block demotion exists to prevent. Only attach a child→T block when that one
+   child _specifically and solely_ carries the dependency (then retire the parent's).
 
 3. Set the parent to its container status:
 

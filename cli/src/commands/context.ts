@@ -199,7 +199,14 @@ function printHuman(
   console.log('BLOCKERS:');
   if (blockers.length === 0) console.log('  (none)');
   for (const b of blockers) {
-    console.log(`  ${summarizeNodeish(b)}`);
+    let line = summarizeNodeish(b);
+    // A broken-down blocker is a coarse, parent-level block: it's hidden from the
+    // graph (its subtasks carry the specific blocks) but still real, so surface it
+    // here in words rather than as an edge the reader can't see.
+    if (strField(b, 'status') === 'broken_down') {
+      line += '  ⟵ coarse parent-level block (broken down; its subtasks carry the specific blocks)';
+    }
+    console.log(`  ${line}`);
   }
 
   const edges = asObjArray(context['edges']);
@@ -260,7 +267,7 @@ function summarizeNodeish(o: Obj): string {
   const status = strField(o, 'status');
   if (id === null && title === null) return JSON.stringify(o);
   let line = `${id ? short(id) : '????????'}  "${title ?? '?'}"  [${status ?? '?'}]`;
-  const type = strField(o, 'type') ?? strField(o, 'edge_type');
+  const type = strField(o, 'type') ?? strField(o, 'edge_type') ?? strField(o, 'block_type');
   if (type !== null) line += `  via ${type}`;
   if (o['stale'] === true) line += '  !! STALE';
   const reason = strField(o, 'invalidation_reason');

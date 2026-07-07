@@ -87,8 +87,19 @@ export function GraphPage() {
       ? taskEdges.filter((e) => visibleIds.has(e.source_id) && visibleIds.has(e.target_id))
       : taskEdges
 
+    // Coarse-block demotion: a firm/soft block incident to a broken_down node is
+    // superseded by its subtasks' granular blocks, so it's hidden from the graph
+    // (and surfaced in `aj context` instead — see cli/src/commands/context.ts).
+    // Layout still sees it below as a ranking hint; only the drawn edge is dropped.
+    const statusById = new Map(visibleNodes.map((n) => [n.id, n.status]))
+    const isCoarseBlock = (e: NodeEdge): boolean =>
+      (e.type === 'firm_block' || e.type === 'soft_block') &&
+      (statusById.get(e.source_id) === 'broken_down' ||
+        statusById.get(e.target_id) === 'broken_down')
+    const renderEdges = visibleEdges.filter((e) => !isCoarseBlock(e))
+
     // Dagre needs an acyclic graph; cycles are legal data, so de-cycle for
-    // layout only — every non-removed edge is still rendered.
+    // layout only — every non-removed edge still informs layout.
     const layoutEdges = acyclicLayoutEdges(visibleNodes, visibleEdges)
     const positions = layoutPositions(visibleNodes, layoutEdges)
 
@@ -99,7 +110,7 @@ export function GraphPage() {
       data: { task: n, stale: invalidSet.has(n.id) && n.status !== 'invalidated' },
     }))
 
-    const flowEdges: FlowEdge[] = visibleEdges.map((e) => {
+    const flowEdges: FlowEdge[] = renderEdges.map((e) => {
       const style = EDGE_STYLE[e.type]
       const render = EDGE_RENDER[e.type]
       return {
