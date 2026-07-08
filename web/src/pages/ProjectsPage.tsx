@@ -54,16 +54,21 @@ export function ProjectsPage() {
     navigate(`/p/${(data as Project).id}`)
   }
 
+  const active = projects.filter((p) => !p.archived_at)
+  const archived = projects.filter((p) => p.archived_at)
+
   return (
     <div className="page projects-page">
       <h1>Projects</h1>
       {error ? <div className="form-error">{error}</div> : null}
       <ul className="project-list">
-        {projects.map((p) => (
+        {active.map((p) => (
           <ProjectCard key={p.id} project={p} onChanged={load} />
         ))}
-        {projects.length === 0 ? <li className="muted">No projects yet — create one below.</li> : null}
+        {active.length === 0 ? <li className="muted">No projects yet — create one below.</li> : null}
       </ul>
+
+      {archived.length > 0 ? <ArchivedProjects projects={archived} onChanged={load} /> : null}
 
       <form className="card create-project" onSubmit={createProject}>
         <h2>Create project</h2>
@@ -112,6 +117,7 @@ function ProjectCard({ project, onChanged }: { project: Project; onChanged: () =
 }
 
 function ProjectSettings({ project, onChanged }: { project: Project; onChanged: () => Promise<void> }) {
+  const { session } = useAuth()
   const [repoOwner, setRepoOwner] = useState(project.repo_owner ?? '')
   const [repoName, setRepoName] = useState(project.repo_name ?? '')
   const [memberId, setMemberId] = useState('')
@@ -120,6 +126,24 @@ function ProjectSettings({ project, onChanged }: { project: Project; onChanged: 
   const [copied, setCopied] = useState(false)
 
   const syncUrl = `${SUPABASE_URL}/functions/v1/github-sync`
+  const isOwner = session?.user.id === project.created_by
+
+  async function archive() {
+    if (
+      !window.confirm(
+        `Archive "${project.name}"? It disappears from your projects list, but all nodes and history are kept — you can unarchive it later.`,
+      )
+    )
+      return
+    setErr(null)
+    setMsg(null)
+    const { error } = await supabase
+      .from('projects')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', project.id)
+    if (error) setErr(error.message)
+    else await onChanged()
+  }
 
   async function saveRepo(e: FormEvent) {
     e.preventDefault()
@@ -222,6 +246,68 @@ function ProjectSettings({ project, onChanged }: { project: Project; onChanged: 
           Add as agent
         </button>
       </form>
+
+      {isOwner ? (
+        <div className="settings-section">
+          <h3>Archive project</h3>
+          <p className="muted">
+            Hide this project from your list. Nothing is deleted — nodes and history are kept, and you can
+            unarchive it later.
+          </p>
+          <button type="button" className="btn-small btn-danger" onClick={archive}>
+            Archive project
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function ArchivedProjects({
+  projects,
+  onChanged,
+}: {
+  projects: Project[]
+  onChanged: () => Promise<void>
+}) {
+  const { session } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function unarchive(project: Project) {
+    setErr(null)
+    const { error } = await supabase
+      .from('projects')
+      .update({ archived_at: null })
+      .eq('id', project.id)
+    if (error) setErr(error.message)
+    else await onChanged()
+  }
+
+  return (
+    <div className="archived-projects">
+      <button className="btn-small" onClick={() => setOpen((o) => !o)}>
+        {open ? 'Hide' : 'Show'} archived ({projects.length})
+      </button>
+      {err ? <div className="form-error">{err}</div> : null}
+      {open ? (
+        <ul className="project-list archived-list">
+          {projects.map((p) => (
+            <li key={p.id} className="card project-card archived">
+              <div className="project-card-head">
+                <Link to={`/p/${p.id}`} className="project-link muted">
+                  {p.name}
+                </Link>
+                {session?.user.id === p.created_by ? (
+                  <button className="btn-small" onClick={() => void unarchive(p)}>
+                    Unarchive
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   )
 }
