@@ -66,7 +66,8 @@ projects (
   repo_name text,
   webhook_secret text not null default encode(gen_random_bytes(32), 'hex'),
   created_by uuid not null references auth.users(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  archived_at timestamptz            -- soft-archive; null = active. "Delete" = archive (reversible); history kept, hard delete forbidden
 )
 
 project_members (
@@ -130,7 +131,8 @@ events (  -- append-only audit log
   actor_role text not null check (actor_role in ('human','agent','system')),
   type text not null,        -- e.g. node.created, node.status_changed, node.claimed,
                               --      node.invalidated, edge.created, message.posted,
-                              --      pr.opened, pr.merged, canvas.snapshot.
+                              --      pr.opened, pr.merged, canvas.snapshot,
+                              --      project.archived, project.unarchived (node_id null).
                               --      node.marked_stale is HISTORICAL: no longer emitted
                               --      since staleness became derived-only; old rows remain
                               --      forever (history is sacred)
@@ -146,6 +148,7 @@ events (  -- append-only audit log
 - `nodes` `BEFORE UPDATE`: maintain `updated_at`.
 - `AFTER INSERT/UPDATE` on `nodes`, `AFTER INSERT` on `edges`/`messages`: write an `events` row (on node update, log changed fields; always log status transitions as `node.status_changed` with `{from, to}`).
 - `AFTER INSERT` on `projects`: add creator to `project_members` as `owner`, and create the **vision node** (`is_vision = true`, title = project name, status `human_braindump_needed`).
+- `AFTER UPDATE` on `projects`: when `archived_at` changes, log a `project.archived` / `project.unarchived` event (`node_id` null).
 
 ### RPCs (security invoker unless noted)
 
@@ -159,7 +162,7 @@ events (  -- append-only audit log
 
 ### RLS policy pattern
 
-- `projects`: select where member **or creator** (`created_by = auth.uid()` — needed because `INSERT ... RETURNING` checks the select policy before the AFTER-INSERT bootstrap trigger has written the owner-membership row); insert where `created_by = auth.uid()`; update where member role `owner`. **`webhook_secret` is never exposed to the agent role** — simplest: a view or column privilege revoke for non-owners is overkill for v1; instead the web UI (owner) reads it, and the CLI never selects it.
+- `projects`: select where member **or creator** (`created_by = auth.uid()` — needed because `INSERT ... RETURNING` checks the select policy before the AFTER-INSERT bootstrap trigger has written the owner-membership row); insert where `created_by = auth.uid()`; update where member role `owner`. **Archiving** ("delete a project") is just the owner setting `archived_at` via that update policy — reversible (`archived_at = null` unarchives), no new policy; archived projects stay SELECT-able so the owner can list/unarchive them, and the web UI filters them out of the default list. **`webhook_secret` is never exposed to the agent role** — simplest: a view or column privilege revoke for non-owners is overkill for v1; instead the web UI (owner) reads it, and the CLI never selects it.
 - All child tables (`nodes`, `edges`, `messages`): select/insert/update where `is_project_member(project_id)`. No delete policies (plus the raise-trigger belt-and-braces).
 - `events`: select/insert where member; no update/delete.
 - `project_members`: select where member; insert/update only by project owner (so the owner adds the agent user to each project by email/id from the web UI).
@@ -231,7 +234,7 @@ Errors: nonzero exit + one-line message. Never swallow Supabase errors.
 
 Vite + React 18 + TypeScript strict + `react-router-dom` + `@supabase/supabase-js` + `@xyflow/react` (graph) + `@dagrejs/dagre` (auto-layout) + `tldraw` (canvas). Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (`.env.example` provided).
 
-Routes: `/login` · `/` (projects list + create; owner can add agent member by user id/email; shows repo + webhook secret setup with GHA install instructions) · `/p/:projectId` (graph) · `/n/:nodeId` (node detail).
+Routes: `/login` · `/` (projects list + create; owner can add agent member by user id/email; shows repo + webhook secret setup with GHA install instructions; **owner can archive a project** from its settings — a reversible soft-delete that hides it from the list while keeping all history — and unarchive from a "Show archived" section) · `/p/:projectId` (graph) · `/n/:nodeId` (node detail).
 
 **Graph view**: dagre top-to-bottom layout over non-removed `subtask` + `firm_block` + `soft_block` edges (vision at top), weighted so hierarchy dominates — subtask weight 4, firm_block 2, soft_block 1 — which ranks a blocker above what it blocks, so block edges flow top-to-bottom instead of sideways; `relates_to` stays out of layout. All non-removed edges are rendered as bezier curves — `subtask` gray (thinner, faded scaffolding), `firm_block` solid red, `soft_block` dashed amber, `relates_to` dotted gray (faint). Cycle-safe, depth-capped traversal; back-edges are dropped from LAYOUT only and still rendered. Node cards encode turn by brightness: human-turn statuses render as light/bright status-colored cards with dark text, agent-turn as dark cards with the status color as border + left accent bar, github/none dark and muted. Descendants of an invalidated node (via non-removed `subtask` edges) are **stale**: they render with the invalidated treatment (dimmed) plus the amber STALE badge while the pill keeps the node's own status label — derived in the view, never persisted, so restoring the ancestor un-stales them automatically. A "Hide invalidated & stale" toolbar toggle (default off, persisted per project in localStorage) filters invalidated + stale nodes and re-runs layout — a human-view convenience only; agents are always served invalidated context. When the toggle hides every node, an empty-state message is shown over the canvas instead of a blank graph. Legend always visible (teaches the light/dark treatment, edge styles, and badges). Live-ish via supabase realtime subscription or refetch-on-focus (either fine).
 

@@ -65,6 +65,8 @@ export interface Project {
   webhook_secret: string
   created_by: string
   created_at: string
+  // Soft-archive: null = active, timestamp = archived (reversible, owner-only).
+  archived_at: string | null
 }
 
 export interface ProjectMember {

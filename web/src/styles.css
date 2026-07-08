@@ -232,6 +232,15 @@ label {
 .project-card-head .btn-small {
   margin-left: auto;
 }
+.archived-projects {
+  margin-bottom: 20px;
+}
+.archived-list {
+  margin-top: 12px;
+}
+.project-card.archived {
+  opacity: 0.65;
+}
 .project-settings {
   margin-top: 12px;
   border-top: 1px solid var(--border);

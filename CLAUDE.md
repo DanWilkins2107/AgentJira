@@ -1,4 +1,4 @@
-# AgentJira
+                                                                     # AgentJira
 
 An opinionated Jira alternative where AI agents and humans collaborate on a freeform graph of task nodes. The founding brief lives in `brief/` (verbatim transcript + decision register) — **`brief/decisions.md` is the product contract**. The technical contract all packages must follow is `docs/architecture.md`.
 
