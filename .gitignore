@@ -12,3 +12,4 @@ supabase/.branches/
 .vite/
 coverage/
 *.tsbuildinfo
+envkey.pem
