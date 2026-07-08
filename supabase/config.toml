@@ -60,3 +60,8 @@ policy = "oneshot"
 # secret), not a Supabase JWT — the caller is a GitHub Actions workflow.
 [functions.github-sync]
 verify_jwt = false
+
+# github-token authenticates the caller via their Supabase JWT (RLS enforces
+# project membership), so JWT verification stays on (the default).
+[functions.github-token]
+verify_jwt = true
