@@ -4,6 +4,7 @@ import { registerAddEdge } from './commands/add-edge.js';
 import { registerClaim } from './commands/claim.js';
 import { registerContext } from './commands/context.js';
 import { registerCreateNode } from './commands/create-node.js';
+import { registerGithubToken } from './commands/github-token.js';
 import { registerInvalidate } from './commands/invalidate.js';
 import { registerLinkPr } from './commands/link-pr.js';
 import { registerPost } from './commands/post.js';
@@ -33,6 +34,7 @@ registerAddEdge(program);
 registerSubmitSpec(program);
 registerSetStatus(program);
 registerLinkPr(program);
+registerGithubToken(program);
 registerInvalidate(program);
 registerSearch(program);
 

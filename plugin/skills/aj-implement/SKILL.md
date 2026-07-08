@@ -31,6 +31,21 @@ Build exactly what the spec says — no gold-plating, no scope creep. If the spe
 
 ## 5. Raise the PR
 
+Push and open the PR **as the app identity**, not as yourself. The human reviewer
+can only approve a PR they didn't author, so authorship must be the app
+(`agentjira[bot]`). Mint a short-lived, repo-scoped token and use it for the push
+and PR creation:
+
+```
+TOKEN=$(aj github-token <node>)
+git push "https://x-access-token:$TOKEN@github.com/<owner>/<repo>.git" HEAD
+GH_TOKEN=$TOKEN gh pr create --title "[AJ] <node title>" --body "<body below>"
+```
+
+- The token lasts ~1h and is scoped to this project's repo with contents +
+  pull-requests write only. Never print it into the PR, logs, or the node thread.
+- If `aj github-token` reports the app isn't installed on the repo, the operator
+  needs to install the GitHub App there (see `docs/architecture.md`).
 - Title: `[AJ] <node title>`
 - Body must contain the marker, exactly:
 

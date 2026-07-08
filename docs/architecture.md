@@ -187,6 +187,21 @@ Local-dev convenience: create `dan@agentjira.local` (owner) and `agent@agentjira
 
 Effects: `pr_opened` → set `pr_url`/`pr_number`, status `pr_raised`. `pr_merged` → status `done`, set `merge_sha`. `pr_approved`/`pr_closed` → event + system message only (no status change; a closed-unmerged PR is for humans/agents to triage). Every call logs an `events` row and posts a `system` message to the node at its current stage. Unknown node or bad secret → 401/404, no detail leaked.
 
+## Agent PR identity (`github-token` Edge Function)
+
+Agents must open PRs as a **GitHub App** (`agentjira[bot]`), never as the operator — GitHub forbids approving your own PR, so the PR author must differ from the human reviewer. (A GitHub App can open and comment on PRs but **cannot submit an approving review**; that is fine because the human approves. An agent-approver would need a separate bot *user* account, out of scope.)
+
+`POST /functions/v1/github-token` — called by the CLI (`aj github-token`). Auth: the caller's Supabase JWT (the agent user); the function runs every query under that token so **RLS enforces project membership** (a non-member sees no node → 404). Body: `{ "node_id": "<uuid>" }`.
+
+The app's private key lives only in this function, as Function secrets:
+
+- `GITHUB_APP_ID` — the app's numeric ID (or client id), used as the JWT `iss`.
+- `GITHUB_APP_PRIVATE_KEY` — the app private key, **PKCS#8 PEM** (`BEGIN PRIVATE KEY`; WebCrypto rejects the PKCS#1 `BEGIN RSA PRIVATE KEY` GitHub hands out — convert with `openssl pkcs8 -topk8 -inform PEM -nocrypt -in app.pem`).
+
+Flow: sign a short-lived (~10 min) app JWT (RS256) → `GET /repos/{owner}/{repo}/installation` to resolve the installation for the node's project repo (no DB column needed) → `POST /app/installations/{id}/access_tokens` scoped to that one repo with `contents: write` + `pull_requests: write`. Response: `{ token, expires_at }` — a ~1h token the agent uses for `git push` and PR creation. Errors: repo not linked → 400; app not installed on the repo → 400; GitHub failures → 502; the token is never logged.
+
+**Per-repo setup:** install the GitHub App on each project repo, and enable branch protection requiring **1 approving review** so the human review is the enforced merge gate (the GHA's merge-on-approval job is unchanged).
+
 ## PR body convention (agents MUST follow)
 
 ```
@@ -222,6 +237,7 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 | `aj submit-spec <node> (--file <path> \| --body <text>)` | Set `spec` + status → `spec_review`, post `spec_submission` message |
 | `aj set-status <node> <status>` | Direct status set (validated against enum) |
 | `aj link-pr <node> --url <u> --number <n>` | Set PR fields + status → `pr_raised` (backup for when the GHA isn't installed) |
+| `aj github-token <node>` | Mint a short-lived (~1h), repo-scoped GitHub App installation token (contents+PR write) via the `github-token` function, so branches/PRs are authored by `agentjira[bot]` and the human can approve. Token → stdout, expiry → stderr |
 | `aj invalidate <node> --reason <text>` | Calls `invalidate_node` RPC (descendants become stale — derived — until this node is restored; blocks unaffected) |
 | `aj search -p <project> <query>` | `search_all` RPC results |
 
