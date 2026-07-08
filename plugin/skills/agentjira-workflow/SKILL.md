@@ -77,7 +77,9 @@ Implements AgentJira node: <web-app-url>/n/<node-uuid>
 AgentJira-Node: <node-uuid>
 ```
 
-The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR to the node. After opening the PR, run `aj link-pr <node> --url <u> --number <n>` as a backup. From `pr_raised` onward, the GHA owns the node's status — do not set it yourself.
+The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR to the node.
+
+Push and open the PR **as the app identity** (`agentjira[bot]`), never as yourself — a human can't approve their own PR, so the app must be the author. Get a token with `aj github-token <node>` and use it for `git push` + `gh pr create` (exact commands in `aj-implement`). After opening, run `aj link-pr <node> --url <u> --number <n>` as a backup. From `pr_raised` onward, the GHA owns the node's status — do not set it yourself.
 
 ## Hard rules
 
