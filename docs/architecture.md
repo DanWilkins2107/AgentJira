@@ -25,6 +25,7 @@ This document is the single source of truth for names, enums, schemas, and API s
 | `spec_review` | human | Spec submitted; human approves (→ `ready_for_pickup`) or rejects (→ `awaiting_agent_spec` with a `review_comment`) |
 | `ready_for_pickup` | agent | Approved spec; an agent may claim and implement |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; GHA merges and reports back |
+| `pr_changes_requested` | agent | Reviewer requested changes / left inline comments; agent addresses them, then `aj resubmit` → `pr_raised`. Mirror of `awaiting_human_response` (human asked the agent, not the other way) |
 | `done` | none | Merged (or completed); `merge_sha` recorded |
 | `invalidated` | none | Marked wrong; `invalidation_reason` recorded; kept forever as context |
 
@@ -179,16 +180,19 @@ Local-dev convenience: create `dan@agentjira.local` (owner) and `agent@agentjira
 ```jsonc
 {
   "node_id": "<uuid>",          // extracted from the PR body marker
-  "action": "pr_opened" | "pr_approved" | "pr_merged" | "pr_closed",
+  "action": "pr_opened" | "pr_approved" | "pr_changes_requested" | "pr_merged" | "pr_closed",
   "pr_url": "https://github.com/o/r/pull/7",
   "pr_number": 7,
   "repo": "owner/name",
   "merge_sha": "<sha>",         // pr_merged only
-  "actor": "github-login"
+  "actor": "github-login",
+  "review_body": "...",         // pr_changes_requested only — reviewer's summary
+  "review_comments": "...",     // pr_changes_requested only — formatted inline comments
+  "review_url": "https://github.com/o/r/pull/7#pullrequestreview-1"  // pr_changes_requested only
 }
 ```
 
-Effects: `pr_opened` → set `pr_url`/`pr_number`, status `pr_raised`. `pr_merged` → status `done`, set `merge_sha`. `pr_approved`/`pr_closed` → event + system message only (no status change; a closed-unmerged PR is for humans/agents to triage). Every call logs an `events` row and posts a `system` message to the node at its current stage. Unknown node or bad secret → 401/404, no detail leaked.
+Effects: `pr_opened` → set `pr_url`/`pr_number`, status `pr_raised`. `pr_changes_requested` → status `pr_changes_requested`, and the review lands on the thread as a **`review_comment`** message (verbatim summary + inline comments + link) so agents work it from the board without leaving for GitHub — this hands the turn back to the agent. `pr_merged` → status `done`, set `merge_sha`. `pr_approved`/`pr_closed` → event + system message only (no status change; a closed-unmerged PR is for humans/agents to triage). Every call logs an `events` row and posts a message to the node at its (new) stage (`system` type, except `pr_changes_requested` which posts `review_comment`). Unknown node or bad secret → 401/404, no detail leaked.
 
 ## Agent PR identity (`github-token` Edge Function)
 
@@ -219,7 +223,7 @@ The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins). PR titles: `[AJ] 
 
 Installed in each project repo. Repo secrets: `AGENTJIRA_SYNC_URL` (edge function URL), `AGENTJIRA_SECRET` (the project's `webhook_secret`). Jobs:
 
-1. **report** — on `pull_request` (opened, reopened, ready_for_review) and `pull_request_review` (submitted) and `pull_request` closed: extract marker; POST the matching action (`pr_opened` / `pr_approved` / `pr_merged` when `merged == true` / `pr_closed`).
+1. **report** — on `pull_request` (opened, reopened, ready_for_review) and `pull_request_review` (submitted) and `pull_request` closed: extract marker; POST the matching action (`pr_opened` / `pr_approved` / `pr_merged` when `merged == true` / `pr_closed`). On a non-approving review it reads the review's inline comments via `gh api` (needs `pull-requests: read`) and POSTs `pr_changes_requested` — carrying the review body, formatted inline comments, and review URL — when the review **requested changes** OR left **any inline comment**. A bare "Comment" review with no inline notes is informational and skipped.
 2. **merge** — on `pull_request_review` submitted+approved: if marker present and PR is mergeable, wait for check suites to succeed (poll via `gh api`, timeout ~20 min), then `gh pr merge --squash` using `GITHUB_TOKEN`, then POST `pr_merged` with the merge SHA. (The `pull_request.closed` report job also fires as backup when merges happen manually — dedupe is server-side idempotent: setting `done` twice is harmless.)
 
 ## CLI: `aj` (package `agentjira-cli`, bin `aj`)
@@ -230,7 +234,7 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 |---|---|
 | `aj whoami` | Current user + role |
 | `aj projects` | List member projects |
-| `aj tasks [-p <project>]` | Nodes in agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`), each annotated: claimed_by, firm/soft blockers and blocker statuses. **Stale nodes are excluded** (derived via `stale_node_ids` — dead until the invalidated ancestor is restored). Firm-blocked-by-not-done and claimed-by-someone-else shown in a separate "not recommended" section, never hidden |
+| `aj tasks [-p <project>]` | Nodes in agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `pr_changes_requested`), each annotated: claimed_by, firm/soft blockers and blocker statuses. **Stale nodes are excluded** (derived via `stale_node_ids` — dead until the invalidated ancestor is restored). Firm-blocked-by-not-done and claimed-by-someone-else shown in a separate "not recommended" section, never hidden |
 | `aj context <node>` | Full context dump: node fields, spec, ancestor chain (statuses, derived stale, invalidation reasons), children, edges, all thread messages grouped by stage, blockers; downloads latest canvas PNGs of the node **and its ancestors** to a temp dir and prints the file paths (agents then Read the images). Serves everything, including stale/invalidated nodes — that contract never changes |
 | `aj claim <node> [--session <label>]` / `aj unclaim <node>` | Set/clear `claimed_by` (default label `hostname:pid`); claim refuses (without `--force`) if already claimed |
 | `aj post <node> --type <message_type> --body <text> [--stage <status>]` | Post a message (stage defaults to node's current status). `--type question` also flips status → `awaiting_human_response` |
@@ -240,6 +244,7 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 | `aj submit-spec <node> (--file <path> \| --body <text>)` | Set `spec` + status → `spec_review`, post `spec_submission` message |
 | `aj set-status <node> <status>` | Direct status set (validated against enum) |
 | `aj link-pr <node> --url <u> --number <n>` | Set PR fields + status → `pr_raised` (backup for when the GHA isn't installed) |
+| `aj resubmit <node> [--body <text>]` | After addressing PR review comments, hand back to review: `pr_changes_requested` → `pr_raised`, posting a `note`. Refuses unless the node is `pr_changes_requested` (`--force` overrides). The explicit round-trip so a WIP push never flips the turn |
 | `aj github-token <node>` | Mint a short-lived (~1h), repo-scoped GitHub App installation token (contents+PR write) via the `github-token` function, so branches/PRs are authored by `agentjira[bot]` and the human can approve. Token → stdout, expiry → stderr |
 | `aj invalidate <node> --reason <text>` | Calls `invalidate_node` RPC (descendants become stale — derived — until this node is restored; blocks unaffected) |
 | `aj search -p <project> <query>` | `search_all` RPC results |
@@ -252,7 +257,7 @@ Vite + React 18 + TypeScript strict + `react-router-dom` + `@supabase/supabase-j
 
 Routes: `/login` · `/` (projects list + create; owner can add agent member by user id/email; shows repo + webhook secret setup with GHA install instructions; **owner can archive a project** from its settings — a reversible soft-delete that hides it from the list while keeping all history — and unarchive from a "Show archived" section) · `/p/:projectId` (graph) · `/n/:nodeId` (node detail).
 
-**Graph view**: dagre top-to-bottom layout over non-removed `subtask` + `firm_block` + `soft_block` edges (vision at top), weighted so hierarchy dominates — subtask weight 4, firm_block 2, soft_block 1 — which ranks a blocker above what it blocks, so block edges flow top-to-bottom instead of sideways; `relates_to` stays out of layout. All non-removed edges are rendered as bezier curves — `subtask` gray (thinner, faded scaffolding), `firm_block` solid red, `soft_block` dashed amber, `relates_to` dotted gray (faint). Cycle-safe, depth-capped traversal; back-edges are dropped from LAYOUT only and still rendered. Node cards encode turn by brightness: human-turn statuses render as light/bright status-colored cards with dark text, agent-turn as dark cards with the status color as border + left accent bar, github/none dark and muted. Descendants of an invalidated node (via non-removed `subtask` edges) are **stale**: they render with the invalidated treatment (dimmed) plus the amber STALE badge while the pill keeps the node's own status label — derived in the view, never persisted, so restoring the ancestor un-stales them automatically. A "Hide invalidated & stale" toolbar toggle (default off, persisted per project in localStorage) filters invalidated + stale nodes and re-runs layout — a human-view convenience only; agents are always served invalidated context. When the toggle hides every node, an empty-state message is shown over the canvas instead of a blank graph. Legend always visible (teaches the light/dark treatment, edge styles, and badges). Live-ish via supabase realtime subscription or refetch-on-focus (either fine).
+**Graph view**: dagre top-to-bottom layout over non-removed `subtask` + `firm_block` + `soft_block` edges (vision at top), weighted so hierarchy dominates — subtask weight 4, firm_block 2, soft_block 1 — which ranks a blocker above what it blocks, so block edges flow top-to-bottom instead of sideways; `relates_to` stays out of layout. All non-removed edges are rendered as bezier curves — `subtask` gray (thinner, faded scaffolding), `firm_block` solid red, `soft_block` dashed amber, `relates_to` dotted gray (faint). Cycle-safe, depth-capped traversal; back-edges are dropped from LAYOUT only and still rendered. Node cards encode turn by brightness (**bright = a human needs to act**): human-turn AND the github turn (`pr_raised`) render as light/bright status-colored cards with dark text — a raised PR is awaiting the human's review on GitHub, so it reads as human-attention — agent-turn as dark cards with the status color as border + left accent bar, `none` (`broken_down`/`done`) dark and muted. Descendants of an invalidated node (via non-removed `subtask` edges) are **stale**: they render with the invalidated treatment (dimmed) plus the amber STALE badge while the pill keeps the node's own status label — derived in the view, never persisted, so restoring the ancestor un-stales them automatically. A "Hide invalidated & stale" toolbar toggle (default off, persisted per project in localStorage) filters invalidated + stale nodes and re-runs layout — a human-view convenience only; agents are always served invalidated context. When the toggle hides every node, an empty-state message is shown over the canvas instead of a blank graph. Legend always visible (teaches the light/dark treatment, edge styles, and badges). Live-ish via supabase realtime subscription or refetch-on-focus (either fine).
 
 **Status colors** (the "brighter = human needed" rule, use everywhere incl. legend and node detail):
 
@@ -266,14 +271,15 @@ Routes: `/login` · `/` (projects list + create; owner can add agent member by u
 | `split_approved` | muted indigo `#4263eb` |
 | `awaiting_agent_spec` | muted cyan `#22b8cf` |
 | `ready_for_pickup` | muted teal `#12b886` |
-| `pr_raised` | purple `#9775fa` |
+| `pr_raised` | purple `#9775fa` (bright — awaiting the human's PR review) |
+| `pr_changes_requested` | deep violet `#7048e8` (agent turn) |
 | `broken_down` | gray-blue `#748ffc` at 50% |
 | `done` | muted green `#40c057` at 70% |
 | `invalidated` | gray `#868e96` |
 
 Stale (derived — ancestor currently invalidated) → amber `#f59f00` STALE corner badge (solid, top-right; dashed amber is reserved for `soft_block` edges) on top of the invalidated card treatment. `claimed_by` set → pulsing dot badge.
 
-**Node detail**: a **stage-flow stepper** at the top renders the whole canonical pipeline (`human_braindump_needed` → `awaiting_agent_breakdown` → fork: split path `split_proposed` → `split_approved` → `broken_down`, or spec path `awaiting_agent_spec` → `spec_review` → `ready_for_pickup` → `pr_raised` → `done`), marking each step visited / current / skipped / future from the node's `node.status_changed` events; `awaiting_human_response` and `invalidated` render as off-rail chips (invalidated dims the rail). The stepper carries the single primary **next button** for the current status (braindump done → `awaiting_agent_breakdown`; answered → back to the status the question interrupted) or a cue pointing at the promoted Approve/Reject buttons; agent-turn, GitHub, and terminal statuses show a hint instead. Status pill + turn indicator; action buttons contextual to status (approve/reject split → sets `split_approved` / back to `awaiting_agent_breakdown` with a `split_decision` message; approve/reject spec → `ready_for_pickup` / `awaiting_agent_spec` + `review_comment`; invalidate with required reason → RPC; **restore** on invalidated nodes → back to the pre-invalidation status from events, human may override, clearing `invalidation_reason` — descendants un-stale automatically, nothing else is written; unclaim; manual set-status demoted into a collapsed "Advanced" escape hatch). Markdown body editor (plain textarea + save is fine). Tabs or sections: **Canvas** (tldraw; on save, persist `tldraw_doc` and export PNG → storage → update `canvas_png_path`, log `canvas.snapshot` event), **Threads** (messages grouped by `stage`, newest stage first, composer posts to current stage), **History** (events timeline, rendered readably), **Edges** (list + add-edge form + remove sets `removed_at`), **Spec/PR** (spec markdown, PR link out). Header breadcrumb: ancestor chain, each link colored by status, stale/invalidated ancestors visibly flagged — this is the "descendant of dead premise" warning.
+**Node detail**: a **stage-flow stepper** at the top renders the whole canonical pipeline (`human_braindump_needed` → `awaiting_agent_breakdown` → fork: split path `split_proposed` → `split_approved` → `broken_down`, or spec path `awaiting_agent_spec` → `spec_review` → `ready_for_pickup` → `pr_raised` → `done`), marking each step visited / current / skipped / future from the node's `node.status_changed` events; `awaiting_human_response`, `pr_changes_requested`, and `invalidated` render as off-rail chips anchored to the last on-rail status (invalidated dims the rail; `pr_changes_requested` anchors to `pr_raised` as a "reviewer requested changes" side loop). The stepper carries the single primary **next button** for the current status (braindump done → `awaiting_agent_breakdown`; answered → back to the status the question interrupted) or a cue pointing at the promoted Approve/Reject buttons; agent-turn (incl. `pr_changes_requested`), GitHub, and terminal statuses show a hint instead. Status pill + turn indicator; action buttons contextual to status (approve/reject split → sets `split_approved` / back to `awaiting_agent_breakdown` with a `split_decision` message; approve/reject spec → `ready_for_pickup` / `awaiting_agent_spec` + `review_comment`; invalidate with required reason → RPC; **restore** on invalidated nodes → back to the pre-invalidation status from events, human may override, clearing `invalidation_reason` — descendants un-stale automatically, nothing else is written; unclaim; manual set-status demoted into a collapsed "Advanced" escape hatch). Markdown body editor (plain textarea + save is fine). Tabs or sections: **Canvas** (tldraw; on save, persist `tldraw_doc` and export PNG → storage → update `canvas_png_path`, log `canvas.snapshot` event), **Threads** (messages grouped by `stage`, newest stage first, composer posts to current stage), **History** (events timeline, rendered readably), **Edges** (list + add-edge form + remove sets `removed_at`), **Spec/PR** (spec markdown, PR link out). Header breadcrumb: ancestor chain, each link colored by status, stale/invalidated ancestors visibly flagged — this is the "descendant of dead premise" warning.
 
 Search box (project level) → `search_all`, results link to nodes.
 

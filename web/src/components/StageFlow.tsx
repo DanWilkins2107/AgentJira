@@ -69,7 +69,7 @@ export function questionReturnTarget(events: EventRow[]): NodeStatus {
 }
 
 type StepState = 'visited' | 'current' | 'skipped' | 'future'
-type OffRailChip = 'awaiting_human_response' | 'invalidated' | null
+type OffRailChip = 'awaiting_human_response' | 'pr_changes_requested' | 'invalidated' | null
 
 /** Rail index the off-rail chip anchors to: last on-rail status in the visited sequence. */
 function anchorIndex(rail: NodeStatus[], visited: NodeStatus[]): number {
@@ -112,7 +112,10 @@ export function StageFlow({
     return COMMON_STEPS // undecided: both branches rendered separately as dimmed futures
   }, [atOpenFork, splitTouched, specTouched, visitedSet])
 
-  const offRail = node.status === 'awaiting_human_response' || node.status === 'invalidated'
+  const offRail =
+    node.status === 'awaiting_human_response' ||
+    node.status === 'pr_changes_requested' ||
+    node.status === 'invalidated'
   const currentIdx = offRail ? anchorIndex(rail, visited) : rail.indexOf(node.status)
 
   // Furthest progress along the rendered rail (visited or current) — anything
@@ -131,7 +134,9 @@ export function StageFlow({
   }
 
   const chip: OffRailChip =
-    node.status === 'awaiting_human_response' || node.status === 'invalidated'
+    node.status === 'awaiting_human_response' ||
+    node.status === 'pr_changes_requested' ||
+    node.status === 'invalidated'
       ? node.status
       : null
 
@@ -188,10 +193,10 @@ export function StageFlow({
             Waiting on agent
           </span>
         )
-      case 'pr_raised':
+      case 'pr_changes_requested':
         return (
           <span className="sf-hint" style={{ color }}>
-            With GitHub — merges on approval
+            Reviewer requested changes — agent addresses them, then re-requests review
             {node.pr_url ? (
               <>
                 {' · '}
@@ -200,6 +205,24 @@ export function StageFlow({
                 </a>
               </>
             ) : null}
+          </span>
+        )
+      case 'pr_raised':
+        // Awaiting the human's review on GitHub — the merge is automatic on
+        // approval, so the pending action is the human's. Prompt it like a cue.
+        return (
+          <span className="sf-cue" style={{ background: statusRgba(node.status, 0.25), borderColor: color }}>
+            Your review needed — approve the PR on GitHub
+            {node.pr_url ? (
+              <>
+                {' · '}
+                <a href={node.pr_url} target="_blank" rel="noreferrer">
+                  PR{node.pr_number != null ? ` #${node.pr_number}` : ''} ↗
+                </a>
+              </>
+            ) : (
+              ' ↗'
+            )}
           </span>
         )
       case 'broken_down':
@@ -293,6 +316,16 @@ function Step({ status, state, chip }: { status: NodeStatus; state: StepState; c
           }}
         >
           ⤴ side loop: agent asked a question
+        </div>
+      ) : chip === 'pr_changes_requested' ? (
+        <div
+          className="sf-offrail"
+          style={{
+            borderColor: statusRgba('pr_changes_requested'),
+            color: statusRgba('pr_changes_requested'),
+          }}
+        >
+          ⤴ side loop: reviewer requested changes
         </div>
       ) : chip === 'invalidated' ? (
         <div

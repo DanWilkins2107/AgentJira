@@ -12,6 +12,8 @@ jobs:
   # Reports PR state to the AgentJira github-sync Edge Function.
   report:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read   # needed to read a review's inline comments via gh api
     steps:
       - name: Extract AgentJira node marker
         id: marker
@@ -36,11 +38,15 @@ jobs:
       - name: Report PR state to AgentJira
         if: steps.marker.outputs.found == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_ID: ${{ steps.marker.outputs.node_id }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_ACTION: ${{ github.event.action }}
           MERGED: ${{ github.event.pull_request.merged }}
           REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_ID: ${{ github.event.review.id }}
+          REVIEW_BODY: ${{ github.event.review.body }}
+          REVIEW_URL: ${{ github.event.review.html_url }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
@@ -51,6 +57,7 @@ jobs:
         run: |
           ACTION=''
           SHA=''
+          REVIEW_COMMENTS=''
           if [ "$EVENT_NAME" = 'pull_request' ]; then
             case "$EVENT_ACTION" in
               opened|reopened|ready_for_review)
@@ -68,6 +75,18 @@ jobs:
           elif [ "$EVENT_NAME" = 'pull_request_review' ]; then
             if [ "$REVIEW_STATE" = 'approved' ]; then
               ACTION='pr_approved'
+            elif [ "$REVIEW_STATE" = 'changes_requested' ] || [ "$REVIEW_STATE" = 'commented' ]; then
+              # Pull this review's inline comments. Flip the turn back to the agent
+              # when the reviewer formally requested changes OR left any inline note
+              # — a bare "Comment" with no inline notes is informational, so skip it.
+              COMMENTS_JSON="$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews/$REVIEW_ID/comments" \
+                --jq '[.[] | {path: .path, line: (.line // .original_line // 0), body: .body}]' \
+                2>/dev/null || echo '[]')"
+              COUNT="$(jq 'length' <<<"$COMMENTS_JSON")"
+              if [ "$REVIEW_STATE" = 'changes_requested' ] || [ "$COUNT" -gt 0 ]; then
+                ACTION='pr_changes_requested'
+                REVIEW_COMMENTS="$(jq -r '.[] | "- `\(.path):\(.line)` — \(.body)"' <<<"$COMMENTS_JSON")"
+              fi
             fi
           fi
           if [ -z "$ACTION" ]; then
@@ -82,9 +101,17 @@ jobs:
             --arg repo "$REPO" \
             --arg actor "$ACTOR" \
             --arg merge_sha "$SHA" \
+            --arg review_body "$REVIEW_BODY" \
+            --arg review_comments "$REVIEW_COMMENTS" \
+            --arg review_url "$REVIEW_URL" \
             '{node_id: $node_id, action: $action, pr_url: $pr_url,
               pr_number: $pr_number, repo: $repo, actor: $actor}
-             + (if $merge_sha != "" then {merge_sha: $merge_sha} else {} end)')"
+             + (if $merge_sha != "" then {merge_sha: $merge_sha} else {} end)
+             + (if $action == "pr_changes_requested" then
+                  (if $review_body != "" then {review_body: $review_body} else {} end)
+                  + (if $review_comments != "" then {review_comments: $review_comments} else {} end)
+                  + (if $review_url != "" then {review_url: $review_url} else {} end)
+                else {} end)')"
           echo "Reporting $ACTION for node $NODE_ID"
           curl -fsS -X POST "$AGENTJIRA_SYNC_URL" \
             -H 'Content-Type: application/json' \

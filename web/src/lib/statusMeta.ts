@@ -23,6 +23,7 @@ export const STATUS_META: Record<NodeStatus, StatusMeta> = {
   awaiting_agent_spec: { color: '#22b8cf', alpha: 1, turn: 'agent', label: 'Awaiting agent spec' },
   ready_for_pickup: { color: '#12b886', alpha: 1, turn: 'agent', label: 'Ready for pickup' },
   pr_raised: { color: '#9775fa', alpha: 1, turn: 'github', label: 'PR raised' },
+  pr_changes_requested: { color: '#7048e8', alpha: 1, turn: 'agent', label: 'PR changes requested' },
   broken_down: { color: '#748ffc', alpha: 0.5, turn: 'none', label: 'Broken down' },
   done: { color: '#40c057', alpha: 0.7, turn: 'none', label: 'Done' },
   invalidated: { color: '#868e96', alpha: 1, turn: 'none', label: 'Invalidated' },
@@ -31,7 +32,7 @@ export const STATUS_META: Record<NodeStatus, StatusMeta> = {
 export const TURN_LABEL: Record<Turn, string> = {
   human: 'Your turn (human)',
   agent: "Agent's turn",
-  github: 'With GitHub (PR review gate)',
+  github: 'Awaiting your review (on GitHub)',
   none: 'No one — settled',
 }
 
@@ -56,9 +57,11 @@ const LIGHT_TEXT = '#f1f3f5'
 
 /**
  * How a graph card (and its legend swatch) renders a status. Encodes the
- * turn split by brightness: human-turn = light/bright status-colored card;
+ * turn split by brightness — bright = a human needs to act:
+ * human-turn AND github-turn = light/bright status-colored card (a raised PR is
+ * awaiting the human's review on GitHub, so it reads as human-attention);
  * agent-turn = dark card with the status color as border + left accent bar;
- * github/none = dark and muted; invalidated = gray, heavily dimmed.
+ * none = dark and muted; invalidated = gray, heavily dimmed.
  */
 export interface CardTreatment {
   background: string
@@ -92,8 +95,10 @@ export function cardTreatment(status: NodeStatus, stale = false): CardTreatment 
     }
   }
   const turn = STATUS_META[status].turn
-  if (turn === 'human') {
+  if (turn === 'human' || turn === 'github') {
     // Light/bright: near-solid status background, dark text, subtle glow.
+    // github (pr_raised) is included — it awaits the human's review on GitHub,
+    // so by "brighter = human needed" it reads as human-attention, not muted.
     return {
       background: statusRgba(status, 0.88),
       borderColor: statusRgba(status),
@@ -114,7 +119,7 @@ export function cardTreatment(status: NodeStatus, stale = false): CardTreatment 
       pillText: '#fff',
     }
   }
-  // github / none: dark and muted; done/broken_down keep their contract
+  // none (broken_down / done): dark and muted; they keep their contract
   // alphas (via statusRgba), which visibly fades their border and pill.
   return {
     background: DARK_MUTED_CARD_BG,

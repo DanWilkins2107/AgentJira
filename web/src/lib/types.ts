@@ -12,6 +12,7 @@ export type NodeStatus =
   | 'spec_review'
   | 'ready_for_pickup'
   | 'pr_raised'
+  | 'pr_changes_requested'
   | 'done'
   | 'invalidated'
 
@@ -26,6 +27,7 @@ export const NODE_STATUSES: NodeStatus[] = [
   'spec_review',
   'ready_for_pickup',
   'pr_raised',
+  'pr_changes_requested',
   'done',
   'invalidated',
 ]

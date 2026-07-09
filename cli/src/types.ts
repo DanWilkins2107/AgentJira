@@ -11,6 +11,7 @@ export const NODE_STATUSES = [
   'spec_review',
   'ready_for_pickup',
   'pr_raised',
+  'pr_changes_requested',
   'done',
   'invalidated',
 ] as const;
@@ -22,6 +23,7 @@ export const AGENT_TURN_STATUSES: readonly NodeStatus[] = [
   'split_approved',
   'awaiting_agent_spec',
   'ready_for_pickup',
+  'pr_changes_requested',
 ];
 
 export const EDGE_TYPES = ['subtask', 'firm_block', 'soft_block', 'relates_to'] as const;

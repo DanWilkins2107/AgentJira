@@ -18,6 +18,7 @@ stateDiagram-v2
     spec_review : spec_review (human)
     ready_for_pickup : ready_for_pickup (agent)
     pr_raised : pr_raised (github)
+    pr_changes_requested : pr_changes_requested (agent)
     done : done (none)
     invalidated : invalidated (none)
 
@@ -36,6 +37,8 @@ stateDiagram-v2
     spec_review --> ready_for_pickup : human approves spec
     spec_review --> awaiting_agent_spec : human rejects with review_comment
     ready_for_pickup --> pr_raised : agent raises PR (GHA pr_opened, aj link-pr)
+    pr_raised --> pr_changes_requested : reviewer requests changes / leaves inline comments
+    pr_changes_requested --> pr_raised : agent addresses comments, aj resubmit
     pr_raised --> done : GitHub approval, GHA merges, pr_merged
 
     note right of invalidated
@@ -96,6 +99,15 @@ sequenceDiagram
     Agent->>Board: aj link-pr (backup path)
     GHA->>Board: POST pr_opened to github-sync
     Note over Board: pr_raised — GHA owns status from here
+    opt reviewer requests changes / leaves inline comments
+        Human->>GitHub: submit review (changes requested or inline comments)
+        GHA->>Board: POST pr_changes_requested (review body + inline comments)
+        Note over Board: pr_changes_requested — turn back to the agent
+        Agent->>Board: aj context (reads the review from the thread)
+        Agent->>GitHub: push fixes on the branch (as the app identity)
+        Agent->>Board: aj resubmit → pr_raised, re-request review on GitHub
+        Note over Board: pr_raised
+    end
     Human->>GitHub: review and approve the PR
     GHA->>Board: POST pr_approved
     GHA->>GitHub: poll checks until green, gh pr merge --squash

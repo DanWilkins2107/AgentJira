@@ -67,6 +67,29 @@ This sets the PR fields and status `pr_raised`, covering repos where the GHA isn
 
 ## 7. Hands off
 
-From `pr_raised` onward **the GHA owns the node's status**: it reports `pr_opened`, merges on GitHub approval once checks are green, and the report-back flips the node to `done` with the merge SHA. Do not set the status yourself past this point. If the PR gets review comments, address them on the branch; if it's closed unmerged, that's for humans/agents to triage on the node.
+From `pr_raised` onward **the GHA owns the node's status**: it reports `pr_opened`, merges on GitHub approval once checks are green, and the report-back flips the node to `done` with the merge SHA. Do not set the status yourself past this point — with one exception, below. If the PR is closed unmerged, that's for humans/agents to triage on the node.
 
-You're done — the claim can stand while the PR is open, or unclaim if you're ending the session.
+You can unclaim if you're ending the session, or let the claim stand while the PR is open.
+
+## 8. If the review requests changes
+
+When a reviewer requests changes or leaves inline comments, the GHA flips the node to **`pr_changes_requested`** (an agent turn) and posts the review to the thread as a `review_comment`. The node reappears in `aj tasks`, so a fresh session can pick it up — you don't have to be the original author.
+
+1. `aj claim <node>` (if not still claimed), then `aj context <node>` — **read the `review_comment`**; it carries the reviewer's summary and inline comments verbatim, so you work from the board, not GitHub.
+2. Check out the PR branch and address every comment. If a comment is wrong or ambiguous, reply on the PR and/or `aj post <node> --type note` rather than guessing.
+3. Push the fixes **as the app identity** (mint a fresh `aj github-token <node>` if the earlier one expired):
+
+   ```
+   TOKEN=$(aj github-token <node>)
+   git push "https://x-access-token:$TOKEN@github.com/<owner>/<repo>.git" HEAD
+   ```
+
+4. Hand the turn back to review:
+
+   ```
+   aj resubmit <node> --body "What you changed in response to the review"
+   ```
+
+   This is the **explicit round-trip** (`pr_changes_requested` → `pr_raised`) — deliberate, so a work-in-progress push never flips the turn on its own. Then re-request the review on GitHub (e.g. `gh pr ready` / re-request reviewers) so the human can approve.
+
+The loop can repeat as many times as the review needs — same as any other agent turn.
