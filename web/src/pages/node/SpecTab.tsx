@@ -1,7 +1,24 @@
+import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import type { TaskNode } from '../../lib/types'
 
-/** Spec text rendered readably + PR link, number and merge SHA. */
-export function SpecTab({ node }: { node: TaskNode }) {
+/** Spec text rendered readably + PR link, number, merge SHA, and the
+ * plan-deliverable toggle (merged PR routes back to breakdown, not done). */
+export function SpecTab({ node, reload }: { node: TaskNode; reload: () => Promise<void> }) {
+  const [err, setErr] = useState<string | null>(null)
+
+  async function setBreakdownOnMerge(value: boolean) {
+    const { error } = await supabase
+      .from('nodes')
+      .update({ breakdown_on_merge: value })
+      .eq('id', node.id)
+    if (error) setErr(error.message)
+    else {
+      setErr(null)
+      await reload()
+    }
+  }
+
   return (
     <div className="spec-tab">
       <div className="card">
@@ -29,6 +46,16 @@ export function SpecTab({ node }: { node: TaskNode }) {
             Merged: <code>{node.merge_sha}</code>
           </p>
         ) : null}
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={node.breakdown_on_merge}
+            onChange={(e) => void setBreakdownOnMerge(e.target.checked)}
+          />
+          Plan deliverable — merged PR routes back to <code>awaiting_agent_breakdown</code>{' '}
+          (the landed document then gets split into tasks) instead of <code>done</code>
+        </label>
+        {err ? <div className="form-error">{err}</div> : null}
       </div>
     </div>
   )

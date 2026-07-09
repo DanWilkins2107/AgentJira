@@ -141,9 +141,9 @@ aj propose-split 3f2a1b --body "1. API schema (firm-blocks 2,3)
 3. Session middleware"
 ```
 
-### `aj create-node -p <project> --title <t> [--body <b>] [--parent <node>] [--status <s>]`
+### `aj create-node -p <project> --title <t> [--body <b>] [--parent <node>] [--status <s>] [--breakdown-on-merge]`
 
-Create a node (default status `awaiting_agent_breakdown`). With `--parent`, also creates a `subtask` edge parent → new node. Used when materializing an approved split — afterwards set the parent to `broken_down`.
+Create a node (default status `awaiting_agent_breakdown`). With `--parent`, also creates a `subtask` edge parent → new node. Used when materializing an approved split — afterwards set the parent to `broken_down`. `--breakdown-on-merge` marks a plan-deliverable node up front (see `aj set-breakdown-on-merge`).
 
 ```sh
 aj create-node -p "My App" --title "API schema" --parent 3f2a1b
@@ -173,6 +173,15 @@ Direct status set, validated against the enum (invalid input lists all valid val
 
 ```sh
 aj set-status 3f2a1b awaiting_agent_spec
+```
+
+### `aj set-breakdown-on-merge <node> [--off]`
+
+Flag a **plan-deliverable** node — one whose PR lands a spec/plan document in the repo rather than finishing the work. When the flagged node's PR merges, `github-sync` routes it back to `awaiting_agent_breakdown` (still recording `merge_sha`) instead of `done`, so the planned work gets split into tasks with the merged document as the primary input. Set it before the PR merges. `--off` clears the flag.
+
+```sh
+aj set-breakdown-on-merge 3f2a1b
+aj set-breakdown-on-merge 3f2a1b --off
 ```
 
 ### `aj link-pr <node> --url <u> --number <n>`

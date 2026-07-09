@@ -17,6 +17,8 @@ Read the full dump **and the downloaded canvas PNGs** (the node's and its ancest
 
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
+**Re-entry from a merged plan?** If the node has `breakdown_on_merge` set and a merged PR (`merge_sha` set, PR linked), it just landed a plan/spec document in the repo and was routed back here to split that work. Read the merged document in the project repo — it is the primary input; propose the split it implies (and question it if it conflicts with the board context).
+
 **Decide: is this node already PR-sized?** Bias toward breaking down. Route straight
 to spec only when the node is *clearly* one coherent change — a title, a short body, and
 your own read all agree it's a single PR. If it's a freshly-created node with thin context

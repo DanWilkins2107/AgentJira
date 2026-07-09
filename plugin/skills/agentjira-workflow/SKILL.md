@@ -69,6 +69,16 @@ This flips the node to `awaiting_human_response` — regular human intervention 
 
 Specs are **tiny and concise**. A node at `awaiting_agent_spec` is already PR-sized; the spec is a few tight paragraphs or bullets: what to build, where, acceptance criteria. Submit with `aj submit-spec <node> --file <path>` (or `--body`), which sets `spec_review`.
 
+## Plan-deliverable nodes — breakdown on merge
+
+Some nodes deliver a **plan/spec document committed to the repo**, not working code. For those, `done` is wrong after the merge — the planned work still has to be split into tasks. Before raising the PR, flag the node:
+
+```
+aj set-breakdown-on-merge <node>
+```
+
+When that PR merges, github-sync routes the node back to `awaiting_agent_breakdown` (still recording `merge_sha`) instead of `done`. Whoever picks it up there treats the merged document as the primary input for the split. `--off` clears the flag; humans can also toggle it from the node's Spec/PR tab.
+
 ## PR conventions (exact)
 
 PR title: `[AJ] <node title>`.

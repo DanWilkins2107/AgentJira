@@ -31,6 +31,14 @@ Build exactly what the spec says — no gold-plating, no scope creep. If the spe
 
 ## 5. Raise the PR
 
+**Plan deliverable?** If this node's PR lands a plan/spec document in the repo rather than working code, flag it **before** the PR merges:
+
+```
+aj set-breakdown-on-merge <node>
+```
+
+On merge the node then returns to `awaiting_agent_breakdown` (instead of `done`) so the planned work gets split into tasks.
+
 Push and open the PR **as the app identity**, not as yourself. The human reviewer
 can only approve a PR they didn't author, so authorship must be the app
 (`agentjira[bot]`). Mint a short-lived, repo-scoped token and use it for the push
@@ -67,7 +75,7 @@ This sets the PR fields and status `pr_raised`, covering repos where the GHA isn
 
 ## 7. Hands off
 
-From `pr_raised` onward **the GHA owns the node's status**: it reports `pr_opened`, merges on GitHub approval once checks are green, and the report-back flips the node to `done` with the merge SHA. Do not set the status yourself past this point — with one exception, below. If the PR is closed unmerged, that's for humans/agents to triage on the node.
+From `pr_raised` onward **the GHA owns the node's status**: it reports `pr_opened`, merges on GitHub approval once checks are green, and the report-back flips the node to `done` with the merge SHA (or back to `awaiting_agent_breakdown` for a plan-deliverable node flagged with `breakdown_on_merge`). Do not set the status yourself past this point — with one exception, below. If the PR is closed unmerged, that's for humans/agents to triage on the node.
 
 You can unclaim if you're ending the session, or let the claim stand while the PR is open.
 

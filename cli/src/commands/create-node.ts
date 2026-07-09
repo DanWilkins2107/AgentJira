@@ -12,6 +12,7 @@ interface Opts {
   body?: string;
   parent?: string;
   status?: string;
+  breakdownOnMerge?: boolean;
 }
 
 export function registerCreateNode(program: Command): void {
@@ -23,6 +24,10 @@ export function registerCreateNode(program: Command): void {
     .option('--body <b>', 'node body (markdown)', '')
     .option('--parent <node>', 'parent node — creates a subtask edge parent -> new node')
     .option('--status <s>', 'initial status (default awaiting_agent_breakdown)')
+    .option(
+      '--breakdown-on-merge',
+      'plan-deliverable node: when its PR merges, route back to awaiting_agent_breakdown instead of done',
+    )
     .option('--json', 'output structured JSON')
     .action(
       wrap(async (opts: Opts) => {
@@ -45,6 +50,7 @@ export function registerCreateNode(program: Command): void {
             title: opts.title,
             body: opts.body ?? '',
             status: status as NodeStatus,
+            breakdown_on_merge: opts.breakdownOnMerge ?? false,
             created_by: userId,
           })
           .select()
@@ -76,7 +82,11 @@ export function registerCreateNode(program: Command): void {
         if (opts.json) {
           printJson({ node, edge });
         } else {
-          console.log(`created node ${node.id} "${node.title}" [${node.status}]`);
+          console.log(
+            `created node ${node.id} "${node.title}" [${node.status}]${
+              node.breakdown_on_merge ? ' (breakdown on merge)' : ''
+            }`,
+          );
           if (edge && parent) {
             console.log(`created subtask edge ${short(parent.id)} -> ${short(node.id)}`);
           }

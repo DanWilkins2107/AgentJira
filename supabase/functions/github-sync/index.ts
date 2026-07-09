@@ -77,7 +77,7 @@ function isSyncPayload(value: unknown): value is SyncPayload {
   );
 }
 
-function messageBody(payload: SyncPayload): string {
+function messageBody(payload: SyncPayload, breakdownOnMerge: boolean): string {
   const pr = payload.pr_number !== undefined ? `PR #${payload.pr_number}` : "PR";
   const by = payload.actor ? ` by ${payload.actor}` : "";
   switch (payload.action) {
@@ -90,7 +90,11 @@ function messageBody(payload: SyncPayload): string {
     case "pr_merged":
       return `${pr} merged${by}${
         payload.merge_sha ? ` (merge SHA ${payload.merge_sha})` : ""
-      }. Node is done.`;
+      }. ${
+        breakdownOnMerge
+          ? "Plan document landed — node returns to breakdown to split the planned work."
+          : "Node is done."
+      }`;
     case "pr_closed":
       return `${pr} closed without merging${by}. Needs triage.`;
   }
@@ -138,7 +142,7 @@ async function handle(
   // Look up the node, then its project's webhook secret. Leak nothing.
   const { data: node, error: nodeError } = await supabase
     .from("nodes")
-    .select("id, project_id, status")
+    .select("id, project_id, status, breakdown_on_merge")
     .eq("id", payload.node_id)
     .maybeSingle();
   if (nodeError) return json({ ok: false }, 500);
@@ -172,9 +176,23 @@ async function handle(
     updates.status = "pr_changes_requested";
     stage = "pr_changes_requested";
   } else if (payload.action === "pr_merged") {
-    updates.status = "done";
     if (payload.merge_sha !== undefined) updates.merge_sha = payload.merge_sha;
-    stage = "done";
+    if (node.breakdown_on_merge === true) {
+      // Plan-deliverable node: the merged PR landed a spec/plan document, so
+      // the node re-enters breakdown to split the planned work instead of
+      // finishing. Only route while the node is still PR-staged — a duplicate
+      // pr_merged (the closed-PR backup job) must not clobber post-merge
+      // progress. (Re-setting `done` below stays harmlessly idempotent.)
+      if (
+        node.status === "pr_raised" || node.status === "pr_changes_requested"
+      ) {
+        updates.status = "awaiting_agent_breakdown";
+        stage = "awaiting_agent_breakdown";
+      }
+    } else {
+      updates.status = "done";
+      stage = "done";
+    }
   }
 
   if (Object.keys(updates).length > 0) {
@@ -217,7 +235,7 @@ async function handle(
     author_role: "system",
     author_id: null,
     type: messageType,
-    body: messageBody(payload),
+    body: messageBody(payload, node.breakdown_on_merge === true),
   });
   if (messageError) return json({ ok: false }, 500);
 

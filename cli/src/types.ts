@@ -66,6 +66,7 @@ export interface NodeRow {
   pr_url: string | null;
   pr_number: number | null;
   merge_sha: string | null;
+  breakdown_on_merge: boolean;
   invalidation_reason: string | null;
   claimed_by: string | null;
   claimed_at: string | null;

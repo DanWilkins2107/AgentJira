@@ -176,6 +176,15 @@ export function NodePage() {
               <span className="claimed-dot" /> claimed by {node.claimed_by}
             </span>
           ) : null}
+          {node.breakdown_on_merge ? (
+            <span
+              className="muted"
+              style={{ fontSize: 12 }}
+              title="Plan deliverable: when this node's PR merges it returns to awaiting_agent_breakdown (to split the planned work) instead of done — toggle on the Spec / PR tab"
+            >
+              ↩ breakdown on merge
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -215,7 +224,7 @@ export function NodePage() {
       {tab === 'edges' ? (
         <EdgesTab node={node} edges={edges} projectNodes={projectNodes} reload={load} />
       ) : null}
-      {tab === 'spec' ? <SpecTab node={node} /> : null}
+      {tab === 'spec' ? <SpecTab node={node} reload={load} /> : null}
       {tab === 'history' ? <HistoryTab events={events} /> : null}
     </div>
   )
