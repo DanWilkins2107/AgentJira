@@ -69,7 +69,12 @@ export function questionReturnTarget(events: EventRow[]): NodeStatus {
 }
 
 type StepState = 'visited' | 'current' | 'skipped' | 'future'
-type OffRailChip = 'awaiting_human_response' | 'pr_changes_requested' | 'invalidated' | null
+type OffRailChip =
+  | 'awaiting_human_response'
+  | 'pr_changes_requested'
+  | 'evaluating_soft_block'
+  | 'invalidated'
+  | null
 
 /** Rail index the off-rail chip anchors to: last on-rail status in the visited sequence. */
 function anchorIndex(rail: NodeStatus[], visited: NodeStatus[]): number {
@@ -115,6 +120,7 @@ export function StageFlow({
   const offRail =
     node.status === 'awaiting_human_response' ||
     node.status === 'pr_changes_requested' ||
+    node.status === 'evaluating_soft_block' ||
     node.status === 'invalidated'
   const currentIdx = offRail ? anchorIndex(rail, visited) : rail.indexOf(node.status)
 
@@ -136,6 +142,7 @@ export function StageFlow({
   const chip: OffRailChip =
     node.status === 'awaiting_human_response' ||
     node.status === 'pr_changes_requested' ||
+    node.status === 'evaluating_soft_block' ||
     node.status === 'invalidated'
       ? node.status
       : null
@@ -191,6 +198,12 @@ export function StageFlow({
         return (
           <span className="sf-hint" style={{ color }}>
             Waiting on agent
+          </span>
+        )
+      case 'evaluating_soft_block':
+        return (
+          <span className="sf-hint" style={{ color }}>
+            Soft-block judge deciding — will proceed, ask you a question, or defer for reassessment
           </span>
         )
       case 'pr_changes_requested':
@@ -326,6 +339,16 @@ function Step({ status, state, chip }: { status: NodeStatus; state: StepState; c
           }}
         >
           ⤴ side loop: reviewer requested changes
+        </div>
+      ) : chip === 'evaluating_soft_block' ? (
+        <div
+          className="sf-offrail"
+          style={{
+            borderColor: statusRgba('evaluating_soft_block'),
+            color: statusRgba('evaluating_soft_block'),
+          }}
+        >
+          ⤴ side loop: soft-block judge deciding
         </div>
       ) : chip === 'invalidated' ? (
         <div

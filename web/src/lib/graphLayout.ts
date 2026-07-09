@@ -7,23 +7,30 @@ export const NODE_HEIGHT = 76
 const DEPTH_CAP = 50
 
 /** Edge types that participate in the dagre layout. relates_to is context only. */
-const LAYOUT_EDGE_TYPES: ReadonlySet<EdgeType> = new Set(['subtask', 'firm_block', 'soft_block'])
+const LAYOUT_EDGE_TYPES: ReadonlySet<EdgeType> = new Set([
+  'subtask',
+  'firm_block',
+  'soft_block',
+  'reassess_after',
+])
 
 /**
  * Dagre edge weights: hierarchy dominates, but block edges still pull the
  * blocker's rank ABOVE what it blocks, so blocks flow top-to-bottom instead
- * of sideways between siblings.
+ * of sideways between siblings. reassess_after gates pickup like a firm block,
+ * so it ranks like one.
  */
 const LAYOUT_EDGE_WEIGHT: Record<EdgeType, number> = {
   subtask: 4,
   firm_block: 2,
+  reassess_after: 2,
   soft_block: 1,
   relates_to: 0, // never in the layout set
 }
 
 /**
  * De-cycle the combined layout edge set (non-removed subtask + firm_block +
- * soft_block) for layout. Cycles are legal data — dagre just can't take them —
+ * soft_block + reassess_after) for layout. Cycles are legal data — dagre can't take them —
  * so we DFS with a visited set + on-stack set (depth cap 50) and drop
  * back-edges from the LAYOUT set only. Dropped edges are still rendered.
  */

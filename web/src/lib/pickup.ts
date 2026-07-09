@@ -14,7 +14,9 @@ import type { NodeEdge, TaskNode } from './types'
  *     restored,
  *   - it is not claimed — a claimed node is already in flight, not a fresh
  *     pickup, and
- *   - it is not firm-blocked by an unfinished blocker (blocker status !== 'done').
+ *   - it is not firm-blocked, nor reassess_after-blocked, by an unfinished
+ *     blocker (blocker status !== 'done'). A reassess_after edge gates pickup
+ *     like a firm block — the node is deferred for re-judgment until then.
  *
  * Soft blocks do NOT disqualify a node — they are judgment, not a gate, exactly
  * as `aj tasks` keeps soft-blocked nodes in RECOMMENDED (with a warning).
@@ -28,12 +30,13 @@ export function readyToPickupIds(
 ): Set<string> {
   const statusById = new Map(nodes.map((n) => [n.id, n.status]))
 
-  // Targets with at least one unfinished firm-block. An unknown blocker (edge to
-  // a node we can't see) counts as unfinished — same as `aj tasks`.
-  const firmBlocked = new Set<string>()
+  // Targets with at least one unfinished firm-block or reassess_after gate. An
+  // unknown blocker (edge to a node we can't see) counts as unfinished — same
+  // as `aj tasks`.
+  const gated = new Set<string>()
   for (const e of edges) {
-    if (e.type !== 'firm_block' || e.removed_at !== null) continue
-    if (statusById.get(e.source_id) !== 'done') firmBlocked.add(e.target_id)
+    if ((e.type !== 'firm_block' && e.type !== 'reassess_after') || e.removed_at !== null) continue
+    if (statusById.get(e.source_id) !== 'done') gated.add(e.target_id)
   }
 
   const ready = new Set<string>()
@@ -41,7 +44,7 @@ export function readyToPickupIds(
     if (STATUS_META[n.status].turn !== 'agent') continue
     if (invalidSet.has(n.id)) continue // invalidated or stale
     if (n.claimed_by !== null) continue // already in flight
-    if (firmBlocked.has(n.id)) continue
+    if (gated.has(n.id)) continue
     ready.add(n.id)
   }
   return ready

@@ -22,6 +22,7 @@ const EDGE_RENDER: Record<NodeEdge['type'], { width: number; opacity: number; zI
   subtask: { width: 2, opacity: 0.55, zIndex: 0 },
   firm_block: { width: 2.5, opacity: 1, zIndex: 1 },
   soft_block: { width: 2.5, opacity: 1, zIndex: 1 },
+  reassess_after: { width: 2.5, opacity: 1, zIndex: 1 },
   relates_to: { width: 1.5, opacity: 0.45, zIndex: 0 },
 }
 
@@ -32,6 +33,7 @@ export function GraphPage() {
   const [taskNodes, setTaskNodes] = useState<TaskNode[]>([])
   const [taskEdges, setTaskEdges] = useState<NodeEdge[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   // Human-view convenience only — agents are always served invalidated
   // context (contract); this never changes what is fetched.
@@ -66,6 +68,7 @@ export function GraphPage() {
     setProject(projRes.data as Project)
     setTaskNodes((nodesRes.data ?? []) as TaskNode[])
     setTaskEdges((edgesRes.data ?? []) as NodeEdge[])
+    setLoaded(true)
   }, [projectId])
 
   useEffect(() => {
@@ -93,13 +96,14 @@ export function GraphPage() {
       ? taskEdges.filter((e) => visibleIds.has(e.source_id) && visibleIds.has(e.target_id))
       : taskEdges
 
-    // Coarse-block demotion: a firm/soft block incident to a broken_down node is
-    // superseded by its subtasks' granular blocks, so it's hidden from the graph
-    // (and surfaced in `aj context` instead — see cli/src/commands/context.ts).
-    // Layout still sees it below as a ranking hint; only the drawn edge is dropped.
+    // Coarse-block demotion: a firm/soft/reassess_after block incident to a
+    // broken_down node is superseded by its subtasks' granular blocks, so it's
+    // hidden from the graph (and surfaced in `aj context` instead — see
+    // cli/src/commands/context.ts). Layout still sees it below as a ranking
+    // hint; only the drawn edge is dropped.
     const statusById = new Map(visibleNodes.map((n) => [n.id, n.status]))
     const isCoarseBlock = (e: NodeEdge): boolean =>
-      (e.type === 'firm_block' || e.type === 'soft_block') &&
+      (e.type === 'firm_block' || e.type === 'soft_block' || e.type === 'reassess_after') &&
       (statusById.get(e.source_id) === 'broken_down' ||
         statusById.get(e.target_id) === 'broken_down')
     const renderEdges = visibleEdges.filter((e) => !isCoarseBlock(e))
@@ -178,21 +182,29 @@ export function GraphPage() {
             stale — hidden by the filter. Untick “Hide invalidated &amp; stale” to see them.
           </div>
         ) : null}
-        <ReactFlow
-          nodes={flowNodes}
-          edges={flowEdges}
-          nodeTypes={nodeTypes}
-          onNodeClick={onNodeClick}
-          fitView
-          minZoom={0.1}
-          nodesDraggable
-          nodesConnectable={false}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Panel position="top-right">
-            <Legend />
-          </Panel>
-        </ReactFlow>
+        {/* Mount ReactFlow only once the first load resolves so `fitView` runs its
+            once-only init fit against the real nodes. Mounting it while nodes are
+            still empty (e.g. remounting after navigating back from a node) fits to
+            nothing and leaves the graph panned off-screen — looking empty. */}
+        {loaded ? (
+          <ReactFlow
+            nodes={flowNodes}
+            edges={flowEdges}
+            nodeTypes={nodeTypes}
+            onNodeClick={onNodeClick}
+            fitView
+            minZoom={0.1}
+            nodesDraggable
+            nodesConnectable={false}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Panel position="top-right">
+              <Legend />
+            </Panel>
+          </ReactFlow>
+        ) : (
+          <div className="graph-empty-state">Loading graph…</div>
+        )}
       </div>
     </div>
   )

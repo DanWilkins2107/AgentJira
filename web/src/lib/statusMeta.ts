@@ -22,6 +22,7 @@ export const STATUS_META: Record<NodeStatus, StatusMeta> = {
   split_approved: { color: '#4263eb', alpha: 1, turn: 'agent', label: 'Split approved' },
   awaiting_agent_spec: { color: '#22b8cf', alpha: 1, turn: 'agent', label: 'Awaiting agent spec' },
   ready_for_pickup: { color: '#12b886', alpha: 1, turn: 'agent', label: 'Ready for pickup' },
+  evaluating_soft_block: { color: '#d9a441', alpha: 1, turn: 'agent', label: 'Evaluating soft block' },
   pr_raised: { color: '#9775fa', alpha: 1, turn: 'github', label: 'PR raised' },
   pr_changes_requested: { color: '#7048e8', alpha: 1, turn: 'agent', label: 'PR changes requested' },
   broken_down: { color: '#748ffc', alpha: 0.5, turn: 'none', label: 'Broken down' },
@@ -149,5 +150,8 @@ export const EDGE_STYLE: Record<EdgeType, EdgeStyleMeta> = {
   subtask: { stroke: '#909296', label: 'subtask (parent → child)' },
   firm_block: { stroke: '#e03131', label: 'firm block' },
   soft_block: { stroke: '#f59f00', dash: '8 5', label: 'soft block' },
+  // Gates pickup like a firm block until the source resolves, then the node is
+  // re-judged. Teal + dotted to sit visually between blocks and context.
+  reassess_after: { stroke: '#0ca678', dash: '2 6', label: 'reassess after' },
   relates_to: { stroke: '#adb5bd', dash: '2 5', label: 'relates to' },
 }

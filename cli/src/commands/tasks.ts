@@ -11,8 +11,12 @@ interface Opts {
   session?: string;
 }
 
+/** Block-family edge types that gate/annotate a task's pickup. */
+type BlockEdgeType = 'firm_block' | 'soft_block' | 'reassess_after';
+const BLOCK_EDGE_TYPES: BlockEdgeType[] = ['firm_block', 'soft_block', 'reassess_after'];
+
 interface BlockerInfo {
-  edge_type: 'firm_block' | 'soft_block';
+  edge_type: BlockEdgeType;
   blocker_id: string;
   blocker_title: string;
   blocker_status: NodeStatus | 'unknown';
@@ -88,8 +92,9 @@ export function registerTasks(program: Command): void {
           ((projData ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]),
         );
 
-        // Non-removed firm/soft block edges targeting these tasks, plus blocker nodes.
-        const edgesByTarget = new Map<string, { source_id: string; type: 'firm_block' | 'soft_block' }[]>();
+        // Non-removed firm/soft/reassess_after block edges targeting these
+        // tasks, plus blocker nodes.
+        const edgesByTarget = new Map<string, { source_id: string; type: BlockEdgeType }[]>();
         const blockerNodes = new Map<string, { title: string; status: NodeStatus }>();
         if (nodes.length > 0) {
           const ids = nodes.map((n) => n.id);
@@ -97,13 +102,13 @@ export function registerTasks(program: Command): void {
             .from('edges')
             .select('source_id, target_id, type')
             .in('target_id', ids)
-            .in('type', ['firm_block', 'soft_block'])
+            .in('type', BLOCK_EDGE_TYPES)
             .is('removed_at', null);
           if (edgeErr) throw new CliError(edgeErr.message);
           const edges = (edgeData ?? []) as {
             source_id: string;
             target_id: string;
-            type: 'firm_block' | 'soft_block';
+            type: BlockEdgeType;
           }[];
           for (const e of edges) {
             const list = edgesByTarget.get(e.target_id) ?? [];
@@ -141,6 +146,16 @@ export function registerTasks(program: Command): void {
           if (unfinishedFirm.length > 0) {
             reasons.push(
               `firm-blocked by ${unfinishedFirm.map((b) => `${short(b.blocker_id)} [${b.blocker_status}]`).join(', ')}`,
+            );
+          }
+          // A reassess_after edge behaves like a firm block until its source is
+          // done: the node is deferred for re-judgment, not actionable yet.
+          const unfinishedReassess = blockers.filter(
+            (b) => b.edge_type === 'reassess_after' && b.unfinished,
+          );
+          if (unfinishedReassess.length > 0) {
+            reasons.push(
+              `awaiting reassessment until ${unfinishedReassess.map((b) => `${short(b.blocker_id)} [${b.blocker_status}]`).join(', ')} resolves`,
             );
           }
           const claimedByOther = n.claimed_by !== null && n.claimed_by !== (opts.session ?? null);
@@ -189,7 +204,9 @@ function printTask(t: TaskEntry, ownLabel: string | null): void {
     const warn =
       b.edge_type === 'soft_block' && b.unfinished
         ? ' — SOFT-BLOCKED: pick up only if nothing better to do and it is not a stretch'
-        : '';
+        : b.edge_type === 'reassess_after' && b.unfinished
+          ? ' — REASSESS-AFTER: deferred for re-judgment; treat as firm-blocked until it resolves'
+          : '';
     console.log(
       `            ${b.edge_type} by ${short(b.blocker_id)} "${b.blocker_title}" [${b.blocker_status}] (${state})${warn}`,
     );

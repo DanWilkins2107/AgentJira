@@ -81,7 +81,7 @@ aj projects
 
 ### `aj tasks [-p <project>] [--session <label>]`
 
-Nodes in the four agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block` edge targeting it (blocker title + status).
+Nodes in the agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block`/`reassess_after` edge targeting it (blocker title + status). A `reassess_after` edge from an unfinished source lands the task in "not recommended", exactly like a firm block — it's deferred for re-judgment until the source resolves.
 
 **Stale** nodes — an ancestor via subtask edges is currently `invalidated` (derived at read time via the `stale_node_ids` RPC, never stored) — are excluded entirely: they are dead until the invalidated ancestor is restored, at which point they reappear automatically. `aj context` still serves them in full.
 
@@ -152,7 +152,7 @@ aj create-node -p "My App" --title "Tiny fix" --status awaiting_agent_spec
 
 ### `aj add-edge --type <edge_type> --from <node> --to <node>`
 
-Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `soft_block`, `relates_to`. Both nodes must be in the same project.
+Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `soft_block`, `reassess_after`, `relates_to`. Both nodes must be in the same project.
 
 ```sh
 aj add-edge --type firm_block --from 9a8b7c --to 3f2a1b   # 9a8b7c firm-blocks 3f2a1b

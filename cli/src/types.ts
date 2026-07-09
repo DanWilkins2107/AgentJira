@@ -10,6 +10,7 @@ export const NODE_STATUSES = [
   'awaiting_agent_spec',
   'spec_review',
   'ready_for_pickup',
+  'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
   'done',
@@ -23,10 +24,11 @@ export const AGENT_TURN_STATUSES: readonly NodeStatus[] = [
   'split_approved',
   'awaiting_agent_spec',
   'ready_for_pickup',
+  'evaluating_soft_block',
   'pr_changes_requested',
 ];
 
-export const EDGE_TYPES = ['subtask', 'firm_block', 'soft_block', 'relates_to'] as const;
+export const EDGE_TYPES = ['subtask', 'firm_block', 'soft_block', 'reassess_after', 'relates_to'] as const;
 export type EdgeType = (typeof EDGE_TYPES)[number];
 
 export const MESSAGE_TYPES = [

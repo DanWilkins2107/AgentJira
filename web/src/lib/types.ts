@@ -11,6 +11,7 @@ export type NodeStatus =
   | 'awaiting_agent_spec'
   | 'spec_review'
   | 'ready_for_pickup'
+  | 'evaluating_soft_block'
   | 'pr_raised'
   | 'pr_changes_requested'
   | 'done'
@@ -26,15 +27,22 @@ export const NODE_STATUSES: NodeStatus[] = [
   'awaiting_agent_spec',
   'spec_review',
   'ready_for_pickup',
+  'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
   'done',
   'invalidated',
 ]
 
-export type EdgeType = 'subtask' | 'firm_block' | 'soft_block' | 'relates_to'
+export type EdgeType = 'subtask' | 'firm_block' | 'soft_block' | 'reassess_after' | 'relates_to'
 
-export const EDGE_TYPES: EdgeType[] = ['subtask', 'firm_block', 'soft_block', 'relates_to']
+export const EDGE_TYPES: EdgeType[] = [
+  'subtask',
+  'firm_block',
+  'soft_block',
+  'reassess_after',
+  'relates_to',
+]
 
 export type MessageType =
   | 'note'
