@@ -1,0 +1,13 @@
+{
+  "name": "agentjira",
+  "owner": {
+    "name": "Dan Wilkins"
+  },
+  "plugins": [
+    {
+      "name": "agentjira",
+      "source": "./plugin",
+      "description": "Skills teaching Claude Code the AgentJira workflow: pick up graph nodes via the aj CLI, break down work, write specs, and implement via PRs with the node marker."
+    }
+  ]
+}

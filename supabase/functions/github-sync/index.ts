@@ -8,11 +8,17 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-type Action = "pr_opened" | "pr_approved" | "pr_merged" | "pr_closed";
+type Action =
+  | "pr_opened"
+  | "pr_approved"
+  | "pr_changes_requested"
+  | "pr_merged"
+  | "pr_closed";
 
 const ACTIONS: readonly Action[] = [
   "pr_opened",
   "pr_approved",
+  "pr_changes_requested",
   "pr_merged",
   "pr_closed",
 ] as const;
@@ -25,11 +31,15 @@ interface SyncPayload {
   repo?: string;
   merge_sha?: string; // pr_merged only
   actor?: string; // github login
+  review_body?: string; // pr_changes_requested only — reviewer's summary text
+  review_comments?: string; // pr_changes_requested only — formatted inline comments
+  review_url?: string; // pr_changes_requested only — link to the review
 }
 
 const EVENT_TYPE: Record<Action, string> = {
   pr_opened: "pr.opened",
   pr_approved: "pr.approved",
+  pr_changes_requested: "pr.changes_requested",
   pr_merged: "pr.merged",
   pr_closed: "pr.closed",
 };
@@ -75,6 +85,8 @@ function messageBody(payload: SyncPayload): string {
       return `${pr} opened${by}${payload.pr_url ? `: ${payload.pr_url}` : ""}`;
     case "pr_approved":
       return `${pr} approved${by} on GitHub.`;
+    case "pr_changes_requested":
+      return reviewMessageBody(payload, pr, by);
     case "pr_merged":
       return `${pr} merged${by}${
         payload.merge_sha ? ` (merge SHA ${payload.merge_sha})` : ""
@@ -82,6 +94,26 @@ function messageBody(payload: SyncPayload): string {
     case "pr_closed":
       return `${pr} closed without merging${by}. Needs triage.`;
   }
+}
+
+/** The pr_changes_requested message carries the review verbatim so agents see
+ * it in `aj context` without leaving the board. Posted as a `review_comment`. */
+function reviewMessageBody(
+  payload: SyncPayload,
+  pr: string,
+  by: string,
+): string {
+  const parts: string[] = [
+    `${pr} review requested changes${by}. Turn returns to the agent — address the comments, then \`aj resubmit\` (or push and re-request review).`,
+  ];
+  if (payload.review_body && payload.review_body.trim()) {
+    parts.push("", payload.review_body.trim());
+  }
+  if (payload.review_comments && payload.review_comments.trim()) {
+    parts.push("", "Inline comments:", payload.review_comments.trim());
+  }
+  if (payload.review_url) parts.push("", payload.review_url);
+  return parts.join("\n");
 }
 
 async function handle(
@@ -126,6 +158,9 @@ async function handle(
 
   // Effects. pr_approved / pr_closed change no node fields — event + system
   // message only; a closed-unmerged PR is for humans/agents to triage.
+  // pr_changes_requested hands the turn back to the agent (mirror of a human
+  // asking a question): status → pr_changes_requested, and the review lands on
+  // the thread as a review_comment so agents work it from the board.
   let stage: string = node.status;
   const updates: Record<string, unknown> = {};
   if (payload.action === "pr_opened") {
@@ -133,6 +168,9 @@ async function handle(
     if (payload.pr_number !== undefined) updates.pr_number = payload.pr_number;
     updates.status = "pr_raised";
     stage = "pr_raised";
+  } else if (payload.action === "pr_changes_requested") {
+    updates.status = "pr_changes_requested";
+    stage = "pr_changes_requested";
   } else if (payload.action === "pr_merged") {
     updates.status = "done";
     if (payload.merge_sha !== undefined) updates.merge_sha = payload.merge_sha;
@@ -166,14 +204,19 @@ async function handle(
   });
   if (eventError) return json({ ok: false }, 500);
 
-  // System message on the node's thread at its current stage.
+  // Message on the node's thread at its (new) stage. Review-change reports post
+  // as a review_comment so the feedback is legible as review feedback in context;
+  // everything else is a system note.
+  const messageType = payload.action === "pr_changes_requested"
+    ? "review_comment"
+    : "system";
   const { error: messageError } = await supabase.from("messages").insert({
     node_id: node.id,
     project_id: node.project_id,
     stage,
     author_role: "system",
     author_id: null,
-    type: "system",
+    type: messageType,
     body: messageBody(payload),
   });
   if (messageError) return json({ ok: false }, 500);

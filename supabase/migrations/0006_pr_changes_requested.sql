@@ -1,0 +1,11 @@
+-- Add the pr_changes_requested status.
+--
+-- When a PR review requests changes — or leaves inline comments — the turn
+-- returns from GitHub to the agent: the node was stuck in pr_raised (github's
+-- turn) with nobody assigned to act. This is the mirror of awaiting_human_response
+-- (agent asked the human); here the human reviewer asked the agent.
+--
+-- ALTER TYPE ... ADD VALUE runs fine inside a transaction on PG12+ as long as the
+-- new value is not USED in the same transaction (it isn't here). Positioned after
+-- pr_raised to keep the enum's declared order aligned with the pipeline.
+alter type public.node_status add value if not exists 'pr_changes_requested' after 'pr_raised';

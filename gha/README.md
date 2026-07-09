@@ -2,7 +2,7 @@
 
 One workflow, installed into each project repo, that closes the PR loop:
 
-- **report** — tells the AgentJira `github-sync` Edge Function about PR state (`pr_opened`, `pr_approved`, `pr_merged`, `pr_closed`), linking the PR to its node via the `AgentJira-Node: <uuid>` marker in the PR body. PRs without the marker are skipped cleanly.
+- **report** — tells the AgentJira `github-sync` Edge Function about PR state (`pr_opened`, `pr_approved`, `pr_changes_requested`, `pr_merged`, `pr_closed`), linking the PR to its node via the `AgentJira-Node: <uuid>` marker in the PR body. PRs without the marker are skipped cleanly. A review that **requests changes** or leaves **inline comments** reports `pr_changes_requested` (with the review body + inline comments), which flips the node back to the agent's turn; a bare "Comment" review with no inline notes is skipped. This needs `pull-requests: read` permission to read the review's comments.
 - **merge** — when a GitHub review is submitted with state *approved* on a marked PR, waits for checks to pass (~20 min timeout; zero check runs counts as pass), verifies mergeability, squash-merges using the repo's own `GITHUB_TOKEN`, then reports `pr_merged` with the merge SHA.
 
 GitHub PR approval is the final human gate: approve the PR and the node flips to `done` on the board.
