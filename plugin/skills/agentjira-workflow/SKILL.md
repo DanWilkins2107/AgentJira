@@ -20,13 +20,15 @@ AgentJira is a graph of task nodes shared between humans and agents. Humans and 
 | `awaiting_agent_spec` | **agent** | Node is PR-sized; write a tiny, concise spec |
 | `spec_review` | human | Human approves (→ `ready_for_pickup`) or rejects (→ `awaiting_agent_spec` with a `review_comment`) |
 | `ready_for_pickup` | **agent** | Approved spec; claim and implement |
+| `evaluating_soft_block` | **agent** | A soft-blocked node handed to the soft-block **judge** (a separate, supervisor-dispatched session) to decide: proceed, ask the human (→ `awaiting_human_response`), or defer (`reassess_after`). A general pickup agent should normally leave this — it's the judge's job |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; the GHA merges and reports back |
 | `pr_changes_requested` | **agent** | Reviewer requested changes / left inline comments; address them, then `aj resubmit` → `pr_raised` |
 | `done` | none | Merged (or completed); `merge_sha` recorded |
 | `invalidated` | none | Marked wrong; reason recorded; kept forever as context |
 
 The **agent-turn statuses** — the only ones you may act on — are exactly:
-`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `pr_changes_requested`.
+`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`.
+(`evaluating_soft_block` is dispatched to the soft-block judge by the supervisor — a general pickup agent should skip it.)
 
 Everything else is a human's turn, GitHub's turn, or terminal. Never fake a human's turn (e.g. never approve your own split or spec).
 
@@ -36,8 +38,9 @@ Edges of type `firm_block` and `soft_block` are **information for you, never har
 
 - **Firm-blocked** (blocker not `done`): the target should ideally wait. Don't pick it up while the blocker is unfinished.
 - **Soft-blocked**: shared decisions. Only pick up soft-blocked work if you have **nothing else to do**, and only when it's **sensible — not too much of a stretch**. If proceeding requires guessing at decisions the blocker will make, it's a stretch: leave it.
+- **Reassess-after** (`reassess_after` edge, source not `done`): the target was deliberately **deferred for re-judgment** until the source resolves. Treat it **exactly like a firm block** — don't pick it up while the source is unfinished. Once the source is `done` it's re-judged (it will typically re-enter `evaluating_soft_block`).
 
-`aj tasks` annotates every node with its blockers and their statuses, and lists firm-blocked / already-claimed nodes in a "not recommended" section — visible, but respect it.
+`aj tasks` annotates every node with its blockers and their statuses, and lists firm-blocked / reassess_after-gated / already-claimed nodes in a "not recommended" section — visible, but respect it.
 
 ## Claim etiquette
 
