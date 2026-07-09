@@ -1,9 +1,17 @@
-import { EDGE_STYLE, STATUS_META, cardTreatment } from '../lib/statusMeta'
+import { EDGE_STYLE, READY_RING, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import { EDGE_TYPES, NODE_STATUSES } from '../lib/types'
 import type { NodeStatus } from '../lib/types'
 
 /** Mini card swatch that teaches the light/dark turn treatment. */
-function StatusSwatch({ status, stale = false }: { status: NodeStatus; stale?: boolean }) {
+function StatusSwatch({
+  status,
+  stale = false,
+  ready = false,
+}: {
+  status: NodeStatus
+  stale?: boolean
+  ready?: boolean
+}) {
   const treat = cardTreatment(status, stale)
   return (
     <span
@@ -14,7 +22,7 @@ function StatusSwatch({ status, stale = false }: { status: NodeStatus; stale?: b
         borderLeft: treat.accentBar
           ? `4px solid ${treat.accentBar}`
           : `1.5px solid ${treat.borderColor}`,
-        boxShadow: treat.glow,
+        boxShadow: ready ? READY_RING : treat.glow,
         opacity: treat.dim,
       }}
     />
@@ -40,6 +48,10 @@ export function Legend() {
         <StatusSwatch status="broken_down" stale />
         <span className="legend-stale-badge-sample">STALE</span>
         <span className="legend-label">stale (ancestor invalidated) — dead until restored</span>
+      </div>
+      <div className="legend-row">
+        <StatusSwatch status="ready_for_pickup" ready />
+        <span className="legend-label">green ring — an agent could pick this up now</span>
       </div>
       <div className="legend-title" style={{ marginTop: 8 }}>
         Edges

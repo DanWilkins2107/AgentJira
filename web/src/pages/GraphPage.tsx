@@ -9,6 +9,7 @@ import { TaskNodeView } from '../components/TaskNodeView'
 import type { TaskFlowNode } from '../components/TaskNodeView'
 import { acyclicLayoutEdges, layoutPositions } from '../lib/graphLayout'
 import { effectivelyInvalidated } from '../lib/invalidation'
+import { readyToPickupIds } from '../lib/pickup'
 import { EDGE_STYLE } from '../lib/statusMeta'
 import { supabase } from '../lib/supabase'
 import type { NodeEdge, Project, TaskNode } from '../lib/types'
@@ -79,6 +80,11 @@ export function GraphPage() {
     // the ancestor is restored.
     const invalidSet = effectivelyInvalidated(taskNodes, taskEdges)
 
+    // Derived, never persisted: the nodes an agent could pick up right now (the
+    // parallelization frontier). Computed on the FULL sets so blockers are all
+    // present, then read per-node below. Mirrors `aj tasks` RECOMMENDED.
+    const readySet = readyToPickupIds(taskNodes, taskEdges, invalidSet)
+
     const visibleNodes = hideInvalidated
       ? taskNodes.filter((n) => !invalidSet.has(n.id))
       : taskNodes
@@ -107,7 +113,11 @@ export function GraphPage() {
       id: n.id,
       type: 'task',
       position: positions.get(n.id) ?? { x: 0, y: 0 },
-      data: { task: n, stale: invalidSet.has(n.id) && n.status !== 'invalidated' },
+      data: {
+        task: n,
+        stale: invalidSet.has(n.id) && n.status !== 'invalidated',
+        ready: readySet.has(n.id),
+      },
     }))
 
     const flowEdges: FlowEdge[] = renderEdges.map((e) => {

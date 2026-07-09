@@ -1,10 +1,10 @@
 import { Handle, Position } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
-import { STATUS_META, cardTreatment } from '../lib/statusMeta'
+import { READY_RING, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import type { TaskNode } from '../lib/types'
 import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graphLayout'
 
-export type TaskFlowNode = Node<{ task: TaskNode; stale: boolean }, 'task'>
+export type TaskFlowNode = Node<{ task: TaskNode; stale: boolean; ready: boolean }, 'task'>
 
 /**
  * Custom graph node. Turn is readable by brightness: human-turn statuses get
@@ -14,12 +14,19 @@ export type TaskFlowNode = Node<{ task: TaskNode; stale: boolean }, 'task'>
  * amber STALE badge; the pill keeps the node's own status label (dimmed) so
  * the story isn't lost, and the card springs back when the ancestor is
  * restored.
+ *
+ * `ready` (derived: an agent could pick this node up right now — see
+ * lib/pickup.ts) draws a subtle green ring, marking the parallelization
+ * frontier. Stale nodes are never ready, so the ring never fights the dim.
  */
 export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
   const task = data.task
   const stale = data.stale && task.status !== 'invalidated'
   const meta = STATUS_META[task.status]
   const treat = cardTreatment(task.status, stale)
+  // Ready cards are always agent-turn (dark, no glow), so the ring never
+  // collides with treat.glow; fall back to it for every other card.
+  const boxShadow = data.ready ? READY_RING : treat.glow
   return (
     <div
       className="task-node"
@@ -32,7 +39,7 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
           ? `6px solid ${treat.accentBar}`
           : `2px solid ${treat.borderColor}`,
         color: treat.text,
-        boxShadow: treat.glow,
+        boxShadow,
         opacity: treat.dim,
       }}
     >

@@ -49,6 +49,15 @@ export function statusRgba(status: NodeStatus, alpha = 1): string {
  * currently invalidated — never persisted). */
 export const STALE_BADGE = '#f59f00'
 
+/**
+ * Subtle green ring for cards an agent could pick up right now (see
+ * lib/pickup.ts) — the parallelization frontier. Uses the ready_for_pickup
+ * green (#12b886) as the semantic "go" color regardless of the node's own
+ * agent-turn status. A crisp inner ring plus a soft outer glow, kept low-alpha
+ * so it reads as an accent, not an alarm. */
+export const READY_RING =
+  '0 0 0 2px rgba(18, 184, 134, 0.6), 0 0 12px 2px rgba(18, 184, 134, 0.25)'
+
 const DARK_CARD_BG = '#1f2226'
 const DARK_MUTED_CARD_BG = '#232529'
 const DARK_TEXT = '#1a1b1e'
