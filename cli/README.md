@@ -152,7 +152,7 @@ aj create-node -p "My App" --title "Tiny fix" --status awaiting_agent_spec
 
 ### `aj add-edge --type <edge_type> --from <node> --to <node>`
 
-Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `soft_block`, `reassess_after`, `relates_to`. Both nodes must be in the same project.
+Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `firm_block_plan`, `soft_block`, `soft_block_plan`, `reassess_after`, `relates_to`. Both nodes must be in the same project. The `_plan` variants gate like their base type only until the source's **plan lands** (source `done` OR `merge_sha` recorded) — use them when the target depends on the source's decision/plan document, not on its full implementation.
 
 ```sh
 aj add-edge --type firm_block --from 9a8b7c --to 3f2a1b   # 9a8b7c firm-blocks 3f2a1b

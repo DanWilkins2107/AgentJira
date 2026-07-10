@@ -66,6 +66,12 @@ The human approved the proposal (read the thread — their `split_decision` mess
    aj add-edge --type soft_block --from <blocker-child> --to <blocked-child>
    ```
 
+   If the blocker is a **plan-deliverable** node (its PR lands a decision/plan
+   document — `breakdown_on_merge`) and the target only needs that *decision*,
+   use the plan variants instead — `firm_block_plan` / `soft_block_plan` —
+   which stop gating once the plan merges rather than waiting for the whole
+   implementation subtree.
+
    **Do NOT replicate the parent's outside blocks onto each child.** If the parent
    blocks some outside node T, that block stays on the parent — once you set the
    parent `broken_down` (step 3) it becomes a *coarse* block: hidden from the graph

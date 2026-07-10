@@ -10,7 +10,9 @@ const DEPTH_CAP = 50
 const LAYOUT_EDGE_TYPES: ReadonlySet<EdgeType> = new Set([
   'subtask',
   'firm_block',
+  'firm_block_plan',
   'soft_block',
+  'soft_block_plan',
   'reassess_after',
 ])
 
@@ -23,8 +25,10 @@ const LAYOUT_EDGE_TYPES: ReadonlySet<EdgeType> = new Set([
 const LAYOUT_EDGE_WEIGHT: Record<EdgeType, number> = {
   subtask: 4,
   firm_block: 2,
+  firm_block_plan: 2,
   reassess_after: 2,
   soft_block: 1,
+  soft_block_plan: 1,
   relates_to: 0, // never in the layout set
 }
 

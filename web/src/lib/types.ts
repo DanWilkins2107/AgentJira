@@ -34,12 +34,21 @@ export const NODE_STATUSES: NodeStatus[] = [
   'invalidated',
 ]
 
-export type EdgeType = 'subtask' | 'firm_block' | 'soft_block' | 'reassess_after' | 'relates_to'
+export type EdgeType =
+  | 'subtask'
+  | 'firm_block'
+  | 'firm_block_plan'
+  | 'soft_block'
+  | 'soft_block_plan'
+  | 'reassess_after'
+  | 'relates_to'
 
 export const EDGE_TYPES: EdgeType[] = [
   'subtask',
   'firm_block',
+  'firm_block_plan',
   'soft_block',
+  'soft_block_plan',
   'reassess_after',
   'relates_to',
 ]

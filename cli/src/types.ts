@@ -28,7 +28,15 @@ export const AGENT_TURN_STATUSES: readonly NodeStatus[] = [
   'pr_changes_requested',
 ];
 
-export const EDGE_TYPES = ['subtask', 'firm_block', 'soft_block', 'reassess_after', 'relates_to'] as const;
+export const EDGE_TYPES = [
+  'subtask',
+  'firm_block',
+  'firm_block_plan',
+  'soft_block',
+  'soft_block_plan',
+  'reassess_after',
+  'relates_to',
+] as const;
 export type EdgeType = (typeof EDGE_TYPES)[number];
 
 export const MESSAGE_TYPES = [

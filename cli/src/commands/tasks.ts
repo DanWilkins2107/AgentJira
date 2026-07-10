@@ -12,14 +12,27 @@ interface Opts {
 }
 
 /** Block-family edge types that gate/annotate a task's pickup. */
-type BlockEdgeType = 'firm_block' | 'soft_block' | 'reassess_after';
-const BLOCK_EDGE_TYPES: BlockEdgeType[] = ['firm_block', 'soft_block', 'reassess_after'];
+type BlockEdgeType =
+  | 'firm_block'
+  | 'soft_block'
+  | 'firm_block_plan'
+  | 'soft_block_plan'
+  | 'reassess_after';
+const BLOCK_EDGE_TYPES: BlockEdgeType[] = [
+  'firm_block',
+  'soft_block',
+  'firm_block_plan',
+  'soft_block_plan',
+  'reassess_after',
+];
 
 interface BlockerInfo {
   edge_type: BlockEdgeType;
   blocker_id: string;
   blocker_title: string;
   blocker_status: NodeStatus | 'unknown';
+  // For plan variants: false once the blocker's plan has landed (status done
+  // OR merge_sha recorded), even though the blocker itself isn't done.
   unfinished: boolean;
 }
 
@@ -95,7 +108,10 @@ export function registerTasks(program: Command): void {
         // Non-removed firm/soft/reassess_after block edges targeting these
         // tasks, plus blocker nodes.
         const edgesByTarget = new Map<string, { source_id: string; type: BlockEdgeType }[]>();
-        const blockerNodes = new Map<string, { title: string; status: NodeStatus }>();
+        const blockerNodes = new Map<
+          string,
+          { title: string; status: NodeStatus; merge_sha: string | null }
+        >();
         if (nodes.length > 0) {
           const ids = nodes.map((n) => n.id);
           const { data: edgeData, error: edgeErr } = await sb
@@ -119,11 +135,16 @@ export function registerTasks(program: Command): void {
           if (blockerIds.length > 0) {
             const { data: blockerData, error: blockerErr } = await sb
               .from('nodes')
-              .select('id, title, status')
+              .select('id, title, status, merge_sha')
               .in('id', blockerIds);
             if (blockerErr) throw new CliError(blockerErr.message);
-            for (const b of (blockerData ?? []) as { id: string; title: string; status: NodeStatus }[]) {
-              blockerNodes.set(b.id, { title: b.title, status: b.status });
+            for (const b of (blockerData ?? []) as {
+              id: string;
+              title: string;
+              status: NodeStatus;
+              merge_sha: string | null;
+            }[]) {
+              blockerNodes.set(b.id, { title: b.title, status: b.status, merge_sha: b.merge_sha });
             }
           }
         }
@@ -133,16 +154,28 @@ export function registerTasks(program: Command): void {
         for (const n of nodes) {
           const blockers: BlockerInfo[] = (edgesByTarget.get(n.id) ?? []).map((e) => {
             const b = blockerNodes.get(e.source_id);
+            // Plan variants are satisfied once the blocker's plan LANDS (done
+            // OR merge_sha recorded); everything else waits for done. Unknown
+            // blockers count as unfinished.
+            const planVariant = e.type === 'firm_block_plan' || e.type === 'soft_block_plan';
+            const unfinished = b
+              ? planVariant
+                ? b.status !== 'done' && b.merge_sha === null
+                : b.status !== 'done'
+              : true;
             return {
               edge_type: e.type,
               blocker_id: e.source_id,
               blocker_title: b?.title ?? '(unknown)',
               blocker_status: b?.status ?? 'unknown',
-              unfinished: b ? b.status !== 'done' : true,
+              unfinished,
             };
           });
           const reasons: string[] = [];
-          const unfinishedFirm = blockers.filter((b) => b.edge_type === 'firm_block' && b.unfinished);
+          const unfinishedFirm = blockers.filter(
+            (b) =>
+              (b.edge_type === 'firm_block' || b.edge_type === 'firm_block_plan') && b.unfinished,
+          );
           if (unfinishedFirm.length > 0) {
             reasons.push(
               `firm-blocked by ${unfinishedFirm.map((b) => `${short(b.blocker_id)} [${b.blocker_status}]`).join(', ')}`,
@@ -200,9 +233,14 @@ function printTask(t: TaskEntry, ownLabel: string | null): void {
     `  ${short(t.id)}  ${t.title}  [${t.status}]${proj}${flags.length > 0 ? '  ' + flags.join('  ') : ''}`,
   );
   for (const b of t.blockers) {
-    const state = b.unfinished ? 'UNFINISHED' : 'finished';
+    const planVariant = b.edge_type === 'firm_block_plan' || b.edge_type === 'soft_block_plan';
+    const state = b.unfinished
+      ? 'UNFINISHED'
+      : planVariant && b.blocker_status !== 'done'
+        ? 'PLAN LANDED — decision available, no longer gating'
+        : 'finished';
     const warn =
-      b.edge_type === 'soft_block' && b.unfinished
+      (b.edge_type === 'soft_block' || b.edge_type === 'soft_block_plan') && b.unfinished
         ? ' — SOFT-BLOCKED: pick up only if nothing better to do and it is not a stretch'
         : b.edge_type === 'reassess_after' && b.unfinished
           ? ' — REASSESS-AFTER: deferred for re-judgment; treat as firm-blocked until it resolves'

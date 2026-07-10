@@ -9,7 +9,7 @@ import { TaskNodeView } from '../components/TaskNodeView'
 import type { TaskFlowNode } from '../components/TaskNodeView'
 import { acyclicLayoutEdges, layoutPositions } from '../lib/graphLayout'
 import { effectivelyInvalidated } from '../lib/invalidation'
-import { readyToPickupIds } from '../lib/pickup'
+import { planLanded, readyToPickupIds } from '../lib/pickup'
 import { EDGE_STYLE } from '../lib/statusMeta'
 import { supabase } from '../lib/supabase'
 import type { NodeEdge, Project, TaskNode } from '../lib/types'
@@ -21,10 +21,21 @@ const nodeTypes = { task: TaskNodeView }
 const EDGE_RENDER: Record<NodeEdge['type'], { width: number; opacity: number; zIndex: number }> = {
   subtask: { width: 2, opacity: 0.55, zIndex: 0 },
   firm_block: { width: 2.5, opacity: 1, zIndex: 1 },
+  firm_block_plan: { width: 2.5, opacity: 1, zIndex: 1 },
   soft_block: { width: 2.5, opacity: 1, zIndex: 1 },
+  soft_block_plan: { width: 2.5, opacity: 1, zIndex: 1 },
   reassess_after: { width: 2.5, opacity: 1, zIndex: 1 },
   relates_to: { width: 1.5, opacity: 0.45, zIndex: 0 },
 }
+
+/** Block-family edge types (base + plan variants + reassess_after). */
+const BLOCK_FAMILY: ReadonlySet<NodeEdge['type']> = new Set([
+  'firm_block',
+  'soft_block',
+  'firm_block_plan',
+  'soft_block_plan',
+  'reassess_after',
+])
 
 export function GraphPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -101,12 +112,20 @@ export function GraphPage() {
     // hidden from the graph (and surfaced in `aj context` instead — see
     // cli/src/commands/context.ts). Layout still sees it below as a ranking
     // hint; only the drawn edge is dropped.
-    const statusById = new Map(visibleNodes.map((n) => [n.id, n.status]))
+    const nodeById = new Map(visibleNodes.map((n) => [n.id, n]))
     const isCoarseBlock = (e: NodeEdge): boolean =>
-      (e.type === 'firm_block' || e.type === 'soft_block' || e.type === 'reassess_after') &&
-      (statusById.get(e.source_id) === 'broken_down' ||
-        statusById.get(e.target_id) === 'broken_down')
+      BLOCK_FAMILY.has(e.type) &&
+      (nodeById.get(e.source_id)?.status === 'broken_down' ||
+        nodeById.get(e.target_id)?.status === 'broken_down')
     const renderEdges = visibleEdges.filter((e) => !isCoarseBlock(e))
+
+    // A satisfied plan-variant block (source's plan landed) no longer gates —
+    // render it faded so the graph reads "context", not "wait".
+    const isSatisfiedPlanBlock = (e: NodeEdge): boolean => {
+      if (e.type !== 'firm_block_plan' && e.type !== 'soft_block_plan') return false
+      const source = nodeById.get(e.source_id)
+      return source !== undefined && planLanded(source)
+    }
 
     // Dagre needs an acyclic graph; cycles are legal data, so de-cycle for
     // layout only — every non-removed edge still informs layout.
@@ -127,6 +146,7 @@ export function GraphPage() {
     const flowEdges: FlowEdge[] = renderEdges.map((e) => {
       const style = EDGE_STYLE[e.type]
       const render = EDGE_RENDER[e.type]
+      const satisfied = isSatisfiedPlanBlock(e)
       return {
         id: e.id,
         source: e.source_id,
@@ -136,10 +156,10 @@ export function GraphPage() {
           stroke: style.stroke,
           strokeWidth: render.width,
           strokeDasharray: style.dash,
-          opacity: render.opacity,
+          opacity: satisfied ? 0.35 : render.opacity,
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
-        zIndex: render.zIndex,
+        zIndex: satisfied ? 0 : render.zIndex,
       }
     })
 
