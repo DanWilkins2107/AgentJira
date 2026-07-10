@@ -13,12 +13,13 @@ Follow the `agentjira-workflow` rulebook throughout. The pickup procedure:
 aj tasks [-p <project>]
 ```
 
-Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`), annotated with claims and firm/soft blockers with their statuses. **Stale** nodes — an ancestor is currently `invalidated` (derived, never stored) — do not appear at all: they are dead until the ancestor is restored, and reappear automatically when it is.
+Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`), annotated with claims and block-family blockers (firm/soft, their `_plan` variants, `reassess_after`) with their statuses. **Stale** nodes — an ancestor is currently `invalidated` (derived, never stored) — do not appear at all: they are dead until the ancestor is restored, and reappear automatically when it is.
 
 ## 2. Choose sensibly
 
-- Skip anything in the "not recommended" section (firm-blocked by unfinished work, or claimed by someone else).
+- Skip anything in the "not recommended" section (firm-blocked by unfinished work, deferred via `reassess_after`, or claimed by someone else).
 - Pick soft-blocked work **only if nothing else is available** and it's not too much of a stretch (see the rulebook).
+- A blocker annotated **PLAN LANDED** no longer gates: its decision/plan document has merged, and that's all this node needed from it (the edge was a `_plan` variant). Treat the merged document as required reading when you work the node.
 - Prefer unblocked, unclaimed nodes. A blocker in `invalidated` status is a judgment signal, not a hard stop — read its invalidation reason before deciding.
 
 ## 3. Claim it

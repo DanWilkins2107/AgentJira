@@ -40,10 +40,16 @@ proposal, which they can approve or reject.
   ```
   aj propose-split <node> --body "1. <child title> — <one-line scope>
   2. <child title> — <one-line scope>
-  3. <child title> — <one-line scope>
+  3. <child title> — <one-line scope> (plan deliverable: decision doc, breakdown_on_merge)
 
-  Edges: 1 firm-blocks 2 (2 builds on 1's schema); 1 soft-blocks 3 (shared naming decisions)."
+  Edges: 1 firm-blocks 2 (2 builds on 1's schema); 3 plan-firm-blocks 1 and 2 (they need 3's decision, not its follow-up work); 1 soft-blocks 3 (shared naming decisions)."
   ```
+
+  **For every proposed block, name the variant and say why** — the human approves the edges too:
+
+  - The target needs the blocker **built and merged** → `firm_block` / `soft_block`.
+  - The target only needs the blocker's **decision/plan document** → `firm_block_plan` / `soft_block_plan` (satisfied the moment the plan merges, even though the blocker then re-enters breakdown to split its follow-up work).
+  - A child whose deliverable **is** a document (decision, design, plan) should be flagged in the proposal as a plan deliverable (`breakdown_on_merge`) — and blocks *from* it should almost always be the `_plan` variants.
 
   This posts the `split_proposal` message and sets the node to `split_proposed`. It is now the human's turn — stop here and unclaim. Do NOT create children yet.
 
@@ -57,7 +63,7 @@ The human approved the proposal (read the thread — their `split_decision` mess
    aj create-node -p <project> --title "<child title>" --body "<one-line scope>" --parent <node>
    ```
 
-   This creates the node plus the `subtask` edge from the parent. Default status `awaiting_agent_breakdown` is correct — children that are obviously PR-sized can be created with `--status awaiting_agent_spec` instead.
+   This creates the node plus the `subtask` edge from the parent. Default status `awaiting_agent_breakdown` is correct — children that are obviously PR-sized can be created with `--status awaiting_agent_spec` instead. A child the proposal marked as a **plan deliverable** (its PR will land a decision/plan document) gets `--breakdown-on-merge` so its merge routes it back to breakdown instead of `done`.
 
 2. Add the proposed **sibling** blocks — only blocks _between the new children_:
 
@@ -66,11 +72,12 @@ The human approved the proposal (read the thread — their `split_decision` mess
    aj add-edge --type soft_block --from <blocker-child> --to <blocked-child>
    ```
 
-   If the blocker is a **plan-deliverable** node (its PR lands a decision/plan
-   document — `breakdown_on_merge`) and the target only needs that *decision*,
-   use the plan variants instead — `firm_block_plan` / `soft_block_plan` —
-   which stop gating once the plan merges rather than waiting for the whole
-   implementation subtree.
+   Use the variant the approved proposal named. Rule of thumb (see the
+   rulebook's "Choosing a block type"): target needs the blocker **built** →
+   base type; target only needs the blocker's **decision/plan document**
+   (typical when the blocker is a `breakdown_on_merge` node) →
+   `firm_block_plan` / `soft_block_plan`, which stop gating the moment the
+   plan merges rather than waiting for the whole implementation subtree.
 
    **Do NOT replicate the parent's outside blocks onto each child.** If the parent
    blocks some outside node T, that block stays on the parent — once you set the

@@ -38,7 +38,16 @@ Edges of type `firm_block` and `soft_block` are **information for you, never har
 
 - **Firm-blocked** (blocker not `done`): the target should ideally wait. Don't pick it up while the blocker is unfinished.
 - **Soft-blocked**: shared decisions. Only pick up soft-blocked work if you have **nothing else to do**, and only when it's **sensible — not too much of a stretch**. If proceeding requires guessing at decisions the blocker will make, it's a stretch: leave it.
-- **Plan variants** (`firm_block_plan` / `soft_block_plan`): same as the base type **until the blocker's plan lands** — blocker `done` OR `merge_sha` recorded — and satisfied from then on (context only, no longer a block), even while the blocker's own follow-up breakdown continues. Use these when creating edges whose dependency is on a **decision/plan document**, not on the blocker's full implementation (typical for `breakdown_on_merge` nodes).
+- **Plan variants** (`firm_block_plan` / `soft_block_plan`): same as the base type **until the blocker's plan lands** — blocker `done` OR `merge_sha` recorded — and satisfied from then on (context only, no longer a block), even while the blocker's own follow-up breakdown continues. `aj tasks` marks a satisfied one "PLAN LANDED" and stops gating on it.
+
+**Choosing a block type — every time you create a block edge, ask: what does the target actually need from the blocker?**
+
+| The target needs… | Use |
+|---|---|
+| the blocker's **implementation** (built, merged, working) | `firm_block` / `soft_block` |
+| only the blocker's **decision/plan** (typically a `breakdown_on_merge` node whose PR lands a document) | `firm_block_plan` / `soft_block_plan` |
+
+Getting this wrong in the plan direction over-blocks: a plain block from a plan-deliverable node **re-arms** when the node re-enters breakdown after its plan merges, and stays armed through `broken_down` — gating the target on the entire implementation subtree when it only ever needed the decision.
 - **Reassess-after** (`reassess_after` edge, source not `done`): the target was deliberately **deferred for re-judgment** until the source resolves. Treat it **exactly like a firm block** — don't pick it up while the source is unfinished. Once the source is `done` it's re-judged (it will typically re-enter `evaluating_soft_block`).
 
 `aj tasks` annotates every node with its blockers and their statuses, and lists firm-blocked / reassess_after-gated / already-claimed nodes in a "not recommended" section — visible, but respect it.
@@ -79,6 +88,8 @@ aj set-breakdown-on-merge <node>
 ```
 
 When that PR merges, github-sync routes the node back to `awaiting_agent_breakdown` (still recording `merge_sha`) instead of `done`. Whoever picks it up there treats the merged document as the primary input for the split. `--off` clears the flag; humans can also toggle it from the node's Spec/PR tab.
+
+Blocks **from** a plan-deliverable node should almost always be the `_plan` variants (`firm_block_plan` / `soft_block_plan`) — targets usually depend on the decision, which lands with the merge, not on the follow-up implementation subtree. See "Choosing a block type" above.
 
 ## PR conventions (exact)
 
