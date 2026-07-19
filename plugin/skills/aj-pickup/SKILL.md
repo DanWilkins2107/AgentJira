@@ -1,13 +1,19 @@
 ---
 name: aj-pickup
-description: Step-by-step procedure for picking up AgentJira work — list tasks, choose one sensibly, claim it, load context, do the stage-appropriate work. Use when asked to "pick up a task", "find something to work on", or start an AgentJira session without a specific node named.
+description: Procedure for picking up AgentJira work. As orchestrator you do NO board work yourself — you list tasks, choose sensibly, and dispatch one subagent per node; each subagent claims, loads context, and does the stage-appropriate work. Use when asked to "pick up a task", "find something to work on", or start an AgentJira session without a specific node named.
 ---
 
 # Picking up AgentJira work
 
-Follow the `agentjira-workflow` rulebook throughout. The pickup procedure:
+Follow the `agentjira-workflow` rulebook throughout.
 
-## 1. List available work
+## You are the orchestrator — delegate every node, do none of the board work yourself
+
+A general "pick up AgentJira work" request (no specific node named) makes you an **orchestrator**. Your entire job is to find candidate nodes and hand each to a **subagent** that does the actual work. You **never** claim, load context, break down, spec, implement, or raise a PR yourself — if you catch yourself running `aj claim` / `aj context` or editing repo files, stop: that's a subagent's job. Listing, choosing, and dispatching is all you do.
+
+> **Already handed one specific node?** If an orchestrator dispatched you to a single node id, you *are* the subagent: skip the orchestrator steps, go straight to **Working a node** below, do it directly, and never spawn a further subagent.
+
+## Orchestrator — step 1: list available work
 
 ```
 aj tasks [-p <project>]
@@ -15,22 +21,37 @@ aj tasks [-p <project>]
 
 Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`), annotated with claims and block-family blockers (firm/soft, their `_plan` variants, `reassess_after`) with their statuses. **Stale** nodes — an ancestor is currently `invalidated` (derived, never stored) — do not appear at all: they are dead until the ancestor is restored, and reappear automatically when it is.
 
-## 2. Choose sensibly
+## Orchestrator — step 2: choose candidates
 
 - Skip anything in the "not recommended" section (firm-blocked by unfinished work, deferred via `reassess_after`, or claimed by someone else).
 - Pick soft-blocked work **only if nothing else is available** and it's not too much of a stretch (see the rulebook).
-- A blocker annotated **PLAN LANDED** no longer gates: its decision/plan document has merged, and that's all this node needed from it (the edge was a `_plan` variant). Treat the merged document as required reading when you work the node.
+- A blocker annotated **PLAN LANDED** no longer gates: its decision/plan document has merged, and that's all this node needed from it (the edge was a `_plan` variant). It becomes required reading for whoever works the node.
 - Prefer unblocked, unclaimed nodes. A blocker in `invalidated` status is a judgment signal, not a hard stop — read its invalidation reason before deciding.
 
-## 3. Claim it
+## Orchestrator — step 3: dispatch one subagent per node
+
+Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parallel when there are several. Give each subagent:
+
+- the **node id**, and the instruction to follow this `aj-pickup` skill's **Working a node** procedure for that one node;
+- a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished.
+
+Never point two subagents at the same node. When they report back, relay a short summary of what each did. If `aj tasks` showed no agent-turn work, say so and stop — don't invent work or do it yourself.
+
+---
+
+# Working a node (subagent)
+
+You've been handed one node. Claim it, load context, do the stage-appropriate work, hand the turn over. Do the work yourself — never delegate onward.
+
+## 1. Claim it
 
 ```
 aj claim <node>
 ```
 
-If the claim is refused because someone else holds it, go back to step 2.
+If the claim is refused because someone else holds it, don't `--force` — report back to the orchestrator that the node is already taken and stop.
 
-## 4. Load context
+## 2. Load context
 
 ```
 aj context <node>
@@ -38,7 +59,7 @@ aj context <node>
 
 Read everything it prints, and **Read the downloaded canvas PNG file paths** it lists (the node's and its ancestors'). Pay particular attention to invalidated/stale ancestors and their reasons.
 
-## 5. Do the stage-appropriate work
+## 3. Do the stage-appropriate work
 
 | Status | What to do |
 |---|---|
@@ -49,7 +70,7 @@ Read everything it prints, and **Read the downloaded canvas PNG file paths** it 
 
 If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human) — then unclaim and move on.
 
-## 6. Post results and hand over
+## 4. Post results and hand over
 
 When your stage's work is done, the status change (via `aj propose-split`, `aj submit-spec`, `aj set-status`, or the PR/GHA) hands the turn over. Post a short `note` if there's context worth recording:
 
@@ -57,7 +78,7 @@ When your stage's work is done, the status change (via `aj propose-split`, `aj s
 aj post <node> --type note --body "..."
 ```
 
-## 7. Unclaim if stopping unfinished
+## 5. Unclaim if stopping unfinished
 
 If you stop for any reason without completing the stage:
 
