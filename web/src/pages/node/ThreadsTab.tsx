@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { MESSAGE_TYPES } from '../../lib/types'
 import type { Message, MessageType, NodeStatus, TaskNode } from '../../lib/types'
 
-/** Messages grouped by stage (newest stage group first); composer posts as human. */
+/** Messages grouped by stage (newest stage group first, newest message first within each); composer posts as human. */
 export function ThreadsTab({
   node,
   messages,
@@ -115,7 +115,7 @@ export function ThreadsTab({
             <StatusPill status={stage} />
             <span className="muted">{msgs.length} message{msgs.length === 1 ? '' : 's'}</span>
           </div>
-          {msgs.map((m) => (
+          {[...msgs].reverse().map((m) => (
             <div key={m.id} className={`message message-${m.author_role}`}>
               <div className="message-meta">
                 <span className={`role-badge role-${m.author_role}`}>{m.author_role}</span>
