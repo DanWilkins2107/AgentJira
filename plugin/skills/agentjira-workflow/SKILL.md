@@ -75,9 +75,11 @@ aj post <node> --type question --body "..."
 
 This flips the node to `awaiting_human_response` — regular human intervention is a feature of this system, not a failure. A cheap question now beats an invalidated subtree later.
 
-## Spec style
+## Brevity — write the least that works
 
-Specs are **tiny and concise**. A node at `awaiting_agent_spec` is already PR-sized; the spec is a few tight paragraphs or bullets: what to build, where, acceptance criteria. Submit with `aj submit-spec <node> --file <path>` (or `--body`), which sets `spec_review`.
+Every word you put on the board is read by a human. **Shorter is always better.** Cut fluff and over-explanation everywhere you write — specs, split proposals, questions, notes, PR bodies, review replies. Prefer bullets to paragraphs; drop preamble, restated context, and anything the human can already see on the node. Say what to do / what you need / what changed, and stop. When in doubt, cut it.
+
+**Specs especially.** A node at `awaiting_agent_spec` is already PR-sized; the spec is a handful of tight bullets — what to build, where, acceptance criteria — never an essay. Submit with `aj submit-spec <node> --file <path>` (or `--body`), which sets `spec_review`.
 
 ## Plan-deliverable nodes — breakdown on merge
 
