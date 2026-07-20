@@ -25,8 +25,17 @@ export function sizeForDepth(depth: number): { width: number; height: number } {
 
 const SIBLING_GAP = 36 // horizontal gap between sibling subtree bands
 const TREE_GAP = 90 // horizontal gap between whole top-level trees
-const LEVEL_GAP = 64 // vertical gap between depth rows
+const LEVEL_GAP = 64 // vertical gap between rank rows
 const DEPTH_CAP = 60
+
+/** Block-family edge types — each keeps its target ranked below its source. */
+const BLOCK_FAMILY: ReadonlySet<string> = new Set([
+  'firm_block',
+  'firm_block_plan',
+  'soft_block',
+  'soft_block_plan',
+  'reassess_after',
+])
 
 export interface NodeBox {
   x: number
@@ -44,10 +53,11 @@ export interface NodeBox {
  * contiguous horizontal column that no foreign node can drift into. Whole
  * top-level trees are laid out side by side in their own disjoint bands too.
  *
- * Block edges, secondary subtask edges, and relates_to do NOT influence layout —
- * they ride on top as overlays (drawn by GraphPage). Cards taper by depth
- * (sizeForDepth), and rows are stacked by the tallest card at each depth so
- * variable-height rows never overlap.
+ * Columns (X) and card size come purely from the subtask spine — blocks and
+ * relates_to never move a node sideways. Block edges DO set vertical order,
+ * though: a node's row is its rank (longest "must sit below" chain of subtask +
+ * block edges), so a blocker is always drawn above what it blocks. Cards taper
+ * by depth (sizeForDepth); rows stack by the tallest card in each rank.
  *
  * Returns each node's absolute box (top-left x/y + width/height). Nodes with no
  * primary parent are roots; a pure subtask cycle (no root reachable) has its
@@ -102,7 +112,6 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
   const depth = new Map<string, number>()
   const size = new Map<string, { width: number; height: number }>()
   const subtreeWidth = new Map<string, number>()
-  const rowHeight: number[] = []
   const visited = new Set<string>()
 
   const measure = (id: string, d: number): void => {
@@ -111,7 +120,6 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
     depth.set(id, d)
     const sz = sizeForDepth(d)
     size.set(id, sz)
-    rowHeight[d] = Math.max(rowHeight[d] ?? 0, sz.height)
 
     const kids = (childrenOf.get(id) ?? []).filter((c) => !visited.has(c))
     let span = 0
@@ -127,12 +135,52 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
   // Pure-cycle survivors: promote the first unvisited node to a root.
   for (const n of nodes) if (!visited.has(n.id)) measure(n.id, 0)
 
-  // Row y-offsets: each depth sits below the tallest card of the depth above it.
-  const rowY: number[] = []
+  // --- Vertical rank: keep every blocked node BELOW what blocks it. ---
+  // Y is driven by rank, not raw spine depth. A node's rank is the longest chain
+  // of "must sit below" constraints reaching it — every subtask edge (a child
+  // sits below its parents) plus every block-family edge (a target sits below
+  // its blocker). So block arrows always point downward, while X (columns) and
+  // card size stay tied to the subtask spine. Cycles are legal data, so an
+  // in-progress node is treated as a chain start to break them.
+  const constraintParents = new Map<string, string[]>()
+  for (const e of edges) {
+    if (e.removed_at !== null || e.source_id === e.target_id) continue
+    if (!nodeIds.has(e.source_id) || !nodeIds.has(e.target_id)) continue
+    if (e.type !== 'subtask' && !BLOCK_FAMILY.has(e.type)) continue
+    const list = constraintParents.get(e.target_id)
+    if (list) list.push(e.source_id)
+    else constraintParents.set(e.target_id, [e.source_id])
+  }
+
+  const rank = new Map<string, number>()
+  const ranking = new Set<string>()
+  const computeRank = (id: string): number => {
+    const cached = rank.get(id)
+    if (cached !== undefined) return cached
+    if (ranking.has(id)) return 0 // cycle: treat this node as a chain start
+    ranking.add(id)
+    let r = 0
+    for (const p of constraintParents.get(id) ?? []) {
+      if (depth.has(p)) r = Math.max(r, computeRank(p) + 1)
+    }
+    ranking.delete(id)
+    rank.set(id, r)
+    return r
+  }
+  for (const id of depth.keys()) computeRank(id)
+
+  // Compact the used ranks into rows (no empty bands): each row is as tall as
+  // its tallest card, stacked with a fixed gap.
+  const rowHeightByRank = new Map<number, number>()
+  for (const id of depth.keys()) {
+    const r = rank.get(id) ?? 0
+    rowHeightByRank.set(r, Math.max(rowHeightByRank.get(r) ?? 0, size.get(id)!.height))
+  }
+  const rankY = new Map<number, number>()
   let accY = 0
-  for (let d = 0; d < rowHeight.length; d++) {
-    rowY[d] = accY
-    accY += (rowHeight[d] ?? 0) + LEVEL_GAP
+  for (const r of [...rowHeightByRank.keys()].sort((a, b) => a - b)) {
+    rankY.set(r, accY)
+    accY += rowHeightByRank.get(r)! + LEVEL_GAP
   }
 
   // --- Pass 2: assign x top-down; a parent centers over its children's block. ---
@@ -164,7 +212,7 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
 
     box.set(id, {
       x: centerX - sz.width / 2,
-      y: rowY[d] ?? 0,
+      y: rankY.get(rank.get(id) ?? 0) ?? 0,
       width: sz.width,
       height: sz.height,
     })

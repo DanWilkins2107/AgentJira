@@ -175,9 +175,12 @@ export function GraphPage() {
 
     // Territorial tidy-tree over the subtask spine: every parent owns a
     // contiguous column no foreign node can enter, and cards taper by depth so
-    // parentage reads at a glance. Blocks/relates are overlays — they don't move
-    // anything (see lib/graphLayout.ts). Positions carry each card's own size.
-    const boxes = treeLayout(visibleNodes, visibleEdges)
+    // parentage reads at a glance. Blocks don't move columns, but they DO push
+    // their target to a lower row (rank) so block arrows always point down — see
+    // lib/graphLayout.ts. Pass renderEdges so ranking honors exactly the blocks
+    // we draw (block-into-container edges are already dropped). Positions carry
+    // each card's own size.
+    const boxes = treeLayout(visibleNodes, renderEdges)
 
     const flowNodes: TaskFlowNode[] = visibleNodes.map((n) => {
       // Broken_down containers carry subtree progress + how many nodes they gate,
