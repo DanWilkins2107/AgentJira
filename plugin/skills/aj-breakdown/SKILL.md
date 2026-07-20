@@ -15,6 +15,8 @@ aj context <node>
 
 Read the full dump **and the downloaded canvas PNGs** (the node's and its ancestors') — the human's braindump often lives on the canvas. Check invalidated ancestors: their reasons tell you which directions are already dead (a **stale** node — ancestor currently invalidated — is itself dead until that ancestor is restored). If the direction is unclear, ask now (`aj post <node> --type question --body "..."`) rather than proposing a split built on guesses.
 
+Then invoke the `aj-stage-notes` skill for this node's current status (`awaiting_agent_breakdown` or `split_approved`) to load any project-specific instructions for this stage (usually none).
+
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
 **Re-entry from a merged plan?** If the node has `breakdown_on_merge` set and a merged PR (`merge_sha` set, PR linked), it just landed a plan/spec document in the repo and was routed back here to split that work. Read the merged document in the project repo — it is the primary input; propose the split it implies (and question it if it conflicts with the board context).

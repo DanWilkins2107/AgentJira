@@ -61,6 +61,8 @@ Read everything it prints, and **Read the downloaded canvas PNG file paths** it 
 
 ## 3. Do the stage-appropriate work
 
+First invoke the `aj-stage-notes` skill for this node's current status — it loads any project-specific instructions for this stage (usually none). Then:
+
 | Status | What to do |
 |---|---|
 | `awaiting_agent_breakdown` | Follow the `aj-breakdown` skill: propose a split, or route to spec if PR-sized |

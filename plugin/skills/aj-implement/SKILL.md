@@ -21,6 +21,8 @@ aj context <node>
 
 Read the spec, the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
 
+Then invoke the `aj-stage-notes` skill for this node's current status (`ready_for_pickup`, or `pr_changes_requested` on a review round) to load any project-specific instructions for this stage (usually none).
+
 ## 3. Branch
 
 Work on a fresh git branch in the project's repo (one repo per project), branched from the default branch.
