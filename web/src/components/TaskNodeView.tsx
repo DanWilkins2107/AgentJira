@@ -4,6 +4,12 @@ import { READY_RING, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import type { TaskNode } from '../lib/types'
 import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graphLayout'
 
+/** Depth-tapered card size, supplied by the tidy-tree layout (graphLayout.ts). */
+interface NodeSize {
+  width: number
+  height: number
+}
+
 export type TaskFlowNode = Node<
   {
     task: TaskNode
@@ -16,6 +22,8 @@ export type TaskFlowNode = Node<
     // Present only for broken_down containers: how far its subtree is toward
     // clearing its coarse gates (see lib/pickup.ts), and how many nodes it gates.
     container?: { settled: number; total: number; complete: boolean; gates: number }
+    // Card size from the layout — parents are bigger, tapering down the spine.
+    size?: NodeSize
   },
   'task'
 >
@@ -61,8 +69,8 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
     <div
       className="task-node"
       style={{
-        width: NODE_WIDTH,
-        minHeight: NODE_HEIGHT,
+        width: data.size?.width ?? NODE_WIDTH,
+        minHeight: data.size?.height ?? NODE_HEIGHT,
         backgroundColor: treat.background,
         border: `2px solid ${treat.borderColor}`,
         borderLeft: containerComplete

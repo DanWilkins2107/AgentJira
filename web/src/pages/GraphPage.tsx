@@ -8,7 +8,7 @@ import { NewNodeDialog } from '../components/NewNodeDialog'
 import { SearchBox } from '../components/SearchBox'
 import { TaskNodeView } from '../components/TaskNodeView'
 import type { TaskFlowNode } from '../components/TaskNodeView'
-import { acyclicLayoutEdges, layoutPositions } from '../lib/graphLayout'
+import { NODE_HEIGHT, NODE_WIDTH, treeLayout } from '../lib/graphLayout'
 import { effectivelyInvalidated } from '../lib/invalidation'
 import {
   blockedFromPickupIds,
@@ -173,10 +173,11 @@ export function GraphPage() {
       return source !== undefined && planLanded(source)
     }
 
-    // Dagre needs an acyclic graph; cycles are legal data, so de-cycle for
-    // layout only — every non-removed edge still informs layout.
-    const layoutEdges = acyclicLayoutEdges(visibleNodes, visibleEdges)
-    const positions = layoutPositions(visibleNodes, layoutEdges)
+    // Territorial tidy-tree over the subtask spine: every parent owns a
+    // contiguous column no foreign node can enter, and cards taper by depth so
+    // parentage reads at a glance. Blocks/relates are overlays — they don't move
+    // anything (see lib/graphLayout.ts). Positions carry each card's own size.
+    const boxes = treeLayout(visibleNodes, visibleEdges)
 
     const flowNodes: TaskFlowNode[] = visibleNodes.map((n) => {
       // Broken_down containers carry subtree progress + how many nodes they gate,
@@ -190,10 +191,11 @@ export function GraphPage() {
               gates: gatesBySource.get(n.id) ?? 0,
             }
           : undefined
+      const box = boxes.get(n.id)
       return {
         id: n.id,
         type: 'task' as const,
-        position: positions.get(n.id) ?? { x: 0, y: 0 },
+        position: box ? { x: box.x, y: box.y } : { x: 0, y: 0 },
         data: {
           task: n,
           stale: invalidSet.has(n.id) && n.status !== 'invalidated',
@@ -201,6 +203,7 @@ export function GraphPage() {
           blocked: blockedSet.has(n.id),
           softBlocked: softSet.has(n.id),
           container,
+          size: { width: box?.width ?? NODE_WIDTH, height: box?.height ?? NODE_HEIGHT },
         },
       }
     })
@@ -216,7 +219,9 @@ export function GraphPage() {
         id: e.id,
         source: e.source_id,
         target: e.target_id,
-        type: 'default', // bezier — organic curves instead of orthogonal steps
+        // The subtask spine reads as structure — orthogonal elbows tracing the
+        // columns; blocks/relates stay bezier so dependencies look distinct.
+        type: e.type === 'subtask' ? 'smoothstep' : 'default',
         style: {
           stroke: style.stroke,
           // Coarse gates read quieter than a direct block: thinner and dashed.
