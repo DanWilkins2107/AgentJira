@@ -143,13 +143,58 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
   // card size stay tied to the subtask spine. Cycles are legal data, so an
   // in-progress node is treated as a chain start to break them.
   const constraintParents = new Map<string, string[]>()
+  const addConstraint = (from: string, to: string): void => {
+    if (from === to) return
+    const list = constraintParents.get(to)
+    if (list) list.push(from)
+    else constraintParents.set(to, [from])
+  }
+
+  // All subtask children (whole DAG, not just the primary spine) — used to sink
+  // a node blocked on a broken_down container below the container's ENTIRE
+  // subtree, so the gate reads as "clears everything under that container".
+  const subtaskKids = new Map<string, string[]>()
+  for (const e of edges) {
+    if (
+      e.type !== 'subtask' ||
+      e.removed_at !== null ||
+      e.source_id === e.target_id ||
+      !nodeIds.has(e.source_id) ||
+      !nodeIds.has(e.target_id)
+    )
+      continue
+    const list = subtaskKids.get(e.source_id)
+    if (list) list.push(e.target_id)
+    else subtaskKids.set(e.source_id, [e.target_id])
+  }
+  const subtreeOf = (root: string): string[] => {
+    const out: string[] = []
+    const seen = new Set<string>([root])
+    const stack = [root]
+    let steps = 0
+    while (stack.length > 0 && steps++ < 5000) {
+      for (const k of subtaskKids.get(stack.pop()!) ?? []) {
+        if (seen.has(k)) continue
+        seen.add(k)
+        out.push(k)
+        stack.push(k)
+      }
+    }
+    return out
+  }
+
   for (const e of edges) {
     if (e.removed_at !== null || e.source_id === e.target_id) continue
     if (!nodeIds.has(e.source_id) || !nodeIds.has(e.target_id)) continue
-    if (e.type !== 'subtask' && !BLOCK_FAMILY.has(e.type)) continue
-    const list = constraintParents.get(e.target_id)
-    if (list) list.push(e.source_id)
-    else constraintParents.set(e.target_id, [e.source_id])
+    if (e.type === 'subtask') {
+      addConstraint(e.source_id, e.target_id)
+    } else if (BLOCK_FAMILY.has(e.type)) {
+      addConstraint(e.source_id, e.target_id)
+      // Blocked on a container → sit below its whole subtree, not just the card.
+      if (byId.get(e.source_id)?.status === 'broken_down') {
+        for (const d of subtreeOf(e.source_id)) addConstraint(d, e.target_id)
+      }
+    }
   }
 
   const rank = new Map<string, number>()

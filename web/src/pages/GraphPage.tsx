@@ -72,21 +72,19 @@ export function GraphPage() {
     [storageKey],
   )
 
-  // Hide settled containers/terminals (broken_down + done) to declutter the
-  // graph down to live work. View-only, same as the invalidated toggle.
-  const settledKey = `aj:hideSettled:${projectId ?? ''}`
-  const [hideSettled, setHideSettled] = useState<boolean>(
-    () => localStorage.getItem(settledKey) === '1',
-  )
+  // Hide done (terminal) nodes to declutter the graph down to live work.
+  // View-only, same as the invalidated toggle.
+  const doneKey = `aj:hideDone:${projectId ?? ''}`
+  const [hideDone, setHideDone] = useState<boolean>(() => localStorage.getItem(doneKey) === '1')
   useEffect(() => {
-    setHideSettled(localStorage.getItem(settledKey) === '1')
-  }, [settledKey])
-  const onToggleHideSettled = useCallback(
+    setHideDone(localStorage.getItem(doneKey) === '1')
+  }, [doneKey])
+  const onToggleHideDone = useCallback(
     (checked: boolean) => {
-      setHideSettled(checked)
-      localStorage.setItem(settledKey, checked ? '1' : '0')
+      setHideDone(checked)
+      localStorage.setItem(doneKey, checked ? '1' : '0')
     },
-    [settledKey],
+    [doneKey],
   )
 
   const load = useCallback(async () => {
@@ -142,7 +140,7 @@ export function GraphPage() {
     // sets above already ran on the full data, so hiding here can't change them.
     const visibleNodes = taskNodes.filter((n) => {
       if (hideInvalidated && invalidSet.has(n.id)) return false
-      if (hideSettled && (n.status === 'broken_down' || n.status === 'done')) return false
+      if (hideDone && n.status === 'done') return false
       return true
     })
     const visibleIds = new Set(visibleNodes.map((n) => n.id))
@@ -238,7 +236,7 @@ export function GraphPage() {
     })
 
     return { flowNodes, flowEdges }
-  }, [taskNodes, taskEdges, hideInvalidated, hideSettled])
+  }, [taskNodes, taskEdges, hideInvalidated, hideDone])
 
   // The toggle can hide every node; say so instead of showing a blank canvas.
   const allHidden = taskNodes.length > 0 && flowNodes.length === 0
@@ -269,10 +267,10 @@ export function GraphPage() {
         <label className="graph-toggle">
           <input
             type="checkbox"
-            checked={hideSettled}
-            onChange={(e) => onToggleHideSettled(e.target.checked)}
+            checked={hideDone}
+            onChange={(e) => onToggleHideDone(e.target.checked)}
           />
-          Hide broken down &amp; done
+          Hide done
         </label>
         <SearchBox projectId={projectId} />
         <button className="btn-approve" onClick={() => setShowNewNode(true)}>
