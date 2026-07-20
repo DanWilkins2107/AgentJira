@@ -1,4 +1,4 @@
-import { EDGE_STYLE, READY_RING, STATUS_META, cardTreatment } from '../lib/statusMeta'
+import { EDGE_STYLE, NOT_PICKABLE_DIM, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import { EDGE_TYPES, NODE_STATUSES } from '../lib/types'
 import type { NodeStatus } from '../lib/types'
 
@@ -6,11 +6,11 @@ import type { NodeStatus } from '../lib/types'
 function StatusSwatch({
   status,
   stale = false,
-  ready = false,
+  notPickable = false,
 }: {
   status: NodeStatus
   stale?: boolean
-  ready?: boolean
+  notPickable?: boolean
 }) {
   const treat = cardTreatment(status, stale)
   return (
@@ -22,8 +22,8 @@ function StatusSwatch({
         borderLeft: treat.accentBar
           ? `4px solid ${treat.accentBar}`
           : `1.5px solid ${treat.borderColor}`,
-        boxShadow: ready ? READY_RING : treat.glow,
-        opacity: treat.dim,
+        boxShadow: treat.glow,
+        opacity: notPickable ? Math.min(treat.dim ?? 1, NOT_PICKABLE_DIM) : treat.dim,
       }}
     />
   )
@@ -50,8 +50,14 @@ export function Legend() {
         <span className="legend-label">stale (ancestor invalidated) — dead until restored</span>
       </div>
       <div className="legend-row">
-        <StatusSwatch status="ready_for_pickup" ready />
-        <span className="legend-label">green ring — an agent could pick this up now</span>
+        <StatusSwatch status="ready_for_pickup" />
+        <span className="legend-label">full opacity — an agent could pick this up now</span>
+      </div>
+      <div className="legend-row">
+        <StatusSwatch status="ready_for_pickup" notPickable />
+        <span className="legend-label">
+          faded — can't be picked up now (blocked, claimed, settled, or your turn)
+        </span>
       </div>
       <div className="legend-row">
         <span className="legend-blocked-badge-sample">BLOCKED</span>

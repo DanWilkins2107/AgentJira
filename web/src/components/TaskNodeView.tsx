@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
-import { READY_RING, STATUS_META, cardTreatment } from '../lib/statusMeta'
+import { NOT_PICKABLE_DIM, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import type { TaskNode } from '../lib/types'
 import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graphLayout'
 
@@ -42,8 +42,10 @@ const CONTAINER_DONE_GLOW = '0 0 10px 1px rgba(18, 184, 134, 0.25)'
  * restored.
  *
  * `ready` (derived: an agent could pick this node up right now — see
- * lib/pickup.ts) draws a subtle green ring, marking the parallelization
- * frontier. Stale nodes are never ready, so the ring never fights the dim.
+ * lib/pickup.ts) marks the parallelization frontier. Rather than accent the few
+ * pickable cards, we fade the many that can't be picked up: ready cards stay at
+ * full opacity, everything else recedes to NOT_PICKABLE_DIM. Invalidated/stale
+ * cards keep their own, deeper fade (the `Math.min` below never brightens them).
  *
  * `blocked` (derived: agent-turn, unclaimed, but held back by an unfinished
  * firm-family gate — see lib/pickup.ts) shows a red BLOCKED badge so it's
@@ -57,14 +59,9 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
   const treat = cardTreatment(task.status, stale)
   const container = data.container
   const containerComplete = container?.complete ?? false
-  // Ready cards are always agent-turn (dark, no glow), so the ring never
-  // collides with treat.glow; a fully-settled container gets a green glow to
-  // signal its gates are clear; otherwise fall back to the treatment glow.
-  const boxShadow = data.ready
-    ? READY_RING
-    : containerComplete
-      ? CONTAINER_DONE_GLOW
-      : treat.glow
+  // A fully-settled container gets a green glow to signal its gates are clear;
+  // otherwise fall back to the treatment glow (light human-turn cards only).
+  const boxShadow = containerComplete ? CONTAINER_DONE_GLOW : treat.glow
   return (
     <div
       className="task-node"
@@ -80,7 +77,9 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
             : `2px solid ${treat.borderColor}`,
         color: treat.text,
         boxShadow,
-        opacity: treat.dim,
+        // Pickable cards stay solid; everything else recedes so the frontier
+        // reads at a glance. Invalidated/stale keep their deeper dim (Math.min).
+        opacity: data.ready ? 1 : Math.min(treat.dim ?? 1, NOT_PICKABLE_DIM),
       }}
     >
       <Handle type="target" position={Position.Top} className="task-node-handle" />

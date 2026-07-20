@@ -52,13 +52,13 @@ export function statusRgba(status: NodeStatus, alpha = 1): string {
 export const STALE_BADGE = '#f59f00'
 
 /**
- * Subtle green ring for cards an agent could pick up right now (see
- * lib/pickup.ts) — the parallelization frontier. Uses the ready_for_pickup
- * green (#12b886) as the semantic "go" color regardless of the node's own
- * agent-turn status. A crisp inner ring plus a soft outer glow, kept low-alpha
- * so it reads as an accent, not an alarm. */
-export const READY_RING =
-  '0 0 0 2px rgba(18, 184, 134, 0.6), 0 0 12px 2px rgba(18, 184, 134, 0.25)'
+ * Opacity for cards an agent can NOT pick up right now (see lib/pickup.ts):
+ * everything outside the parallelization frontier is faded back so the pickable
+ * cards — the only ones left at full opacity — read as the actionable set. The
+ * inverse of the old green ring: we recede the many rather than accent the few.
+ * Invalidated/stale cards keep their own, at-least-as-dim treatment (treat.dim);
+ * combine with `Math.min` so their deeper fade always wins. */
+export const NOT_PICKABLE_DIM = 0.55
 
 const DARK_CARD_BG = '#1f2226'
 const DARK_MUTED_CARD_BG = '#232529'

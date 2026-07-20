@@ -139,15 +139,25 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
   // Y is driven by rank, not raw spine depth. A node's rank is the longest chain
   // of "must sit below" constraints reaching it — every subtask edge (a child
   // sits below its parents) plus every block-family edge (a target sits below
-  // its blocker). So block arrows always point downward, while X (columns) and
-  // card size stay tied to the subtask spine. Cycles are legal data, so an
-  // in-progress node is treated as a chain start to break them.
-  const constraintParents = new Map<string, string[]>()
-  const addConstraint = (from: string, to: string): void => {
+  // its blocker). So block arrows point downward while X (columns) and card size
+  // stay tied to the subtask spine.
+  //
+  // Constraints can form cycles (legal data), which no ranking can fully honor.
+  // We break them with a DFS topological order in which SUBTASK edges are the
+  // trunk (explored first, so they become tree edges and are never the dropped
+  // back-edge) — the subtask hierarchy is therefore always respected (a child is
+  // never above its parent), and only a genuinely cyclic BLOCK edge is dropped.
+  // pr 0 = subtask, pr 1 = block/sink.
+  interface OutEdge {
+    to: string
+    pr: number
+  }
+  const constraintOut = new Map<string, OutEdge[]>()
+  const addConstraint = (from: string, to: string, pr: number): void => {
     if (from === to) return
-    const list = constraintParents.get(to)
-    if (list) list.push(from)
-    else constraintParents.set(to, [from])
+    const list = constraintOut.get(from)
+    if (list) list.push({ to, pr })
+    else constraintOut.set(from, [{ to, pr }])
   }
 
   // All subtask children (whole DAG, not just the primary spine) — used to sink
@@ -187,32 +197,65 @@ export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, No
     if (e.removed_at !== null || e.source_id === e.target_id) continue
     if (!nodeIds.has(e.source_id) || !nodeIds.has(e.target_id)) continue
     if (e.type === 'subtask') {
-      addConstraint(e.source_id, e.target_id)
+      addConstraint(e.source_id, e.target_id, 0)
     } else if (BLOCK_FAMILY.has(e.type)) {
-      addConstraint(e.source_id, e.target_id)
+      addConstraint(e.source_id, e.target_id, 1)
       // Blocked on a container → sit below its whole subtree, not just the card.
       if (byId.get(e.source_id)?.status === 'broken_down') {
-        for (const d of subtreeOf(e.source_id)) addConstraint(d, e.target_id)
+        for (const d of subtreeOf(e.source_id)) addConstraint(d, e.target_id, 1)
       }
     }
   }
 
-  const rank = new Map<string, number>()
-  const ranking = new Set<string>()
-  const computeRank = (id: string): number => {
-    const cached = rank.get(id)
-    if (cached !== undefined) return cached
-    if (ranking.has(id)) return 0 // cycle: treat this node as a chain start
-    ranking.add(id)
-    let r = 0
-    for (const p of constraintParents.get(id) ?? []) {
-      if (depth.has(p)) r = Math.max(r, computeRank(p) + 1)
-    }
-    ranking.delete(id)
-    rank.set(id, r)
-    return r
+  // Explore subtask edges before block edges so the DFS tree follows the
+  // hierarchy; deterministic tie-break keeps layout stable across loads.
+  for (const list of constraintOut.values()) {
+    list.sort((a, b) => a.pr - b.pr || orderKey(a.to).localeCompare(orderKey(b.to)))
   }
-  for (const id of depth.keys()) computeRank(id)
+
+  // DFS topological order (reverse post-order). Edges into a node still on the
+  // stack are back-edges — the cycle breakers — and are dropped; every other
+  // edge is kept and, because subtask edges are explored first, the dropped one
+  // is a block/sink edge whenever the cycle contains any.
+  const state = new Map<string, 0 | 1 | 2>() // 0 unseen, 1 on-stack, 2 done
+  const topo: string[] = []
+  const keptParents = new Map<string, string[]>()
+  const dfs = (root: string): void => {
+    const stack: { id: string; i: number }[] = [{ id: root, i: 0 }]
+    state.set(root, 1)
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]
+      const out = constraintOut.get(frame.id) ?? []
+      if (frame.i < out.length) {
+        const { to } = out[frame.i++]
+        const s = state.get(to) ?? 0
+        if (s === 1) continue // back-edge → drop (breaks the cycle)
+        const parents = keptParents.get(to)
+        if (parents) parents.push(frame.id)
+        else keptParents.set(to, [frame.id])
+        if (s === 0) {
+          state.set(to, 1)
+          stack.push({ id: to, i: 0 })
+        }
+      } else {
+        state.set(frame.id, 2)
+        topo.push(frame.id)
+        stack.pop()
+      }
+    }
+  }
+  for (const id of rootIds) if ((state.get(id) ?? 0) === 0) dfs(id)
+  for (const id of depth.keys()) if ((state.get(id) ?? 0) === 0) dfs(id)
+  topo.reverse()
+
+  // Longest path over the kept (acyclic) constraints: a node's rank is one below
+  // its deepest kept parent. Topological order guarantees parents rank first.
+  const rank = new Map<string, number>()
+  for (const id of topo) {
+    let r = 0
+    for (const p of keptParents.get(id) ?? []) r = Math.max(r, (rank.get(p) ?? 0) + 1)
+    rank.set(id, r)
+  }
 
   // Compact the used ranks into rows (no empty bands): each row is as tall as
   // its tallest card, stacked with a fixed gap.
