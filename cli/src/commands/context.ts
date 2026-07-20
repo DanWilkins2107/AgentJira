@@ -61,17 +61,39 @@ export function registerContext(program: Command): void {
           .filter((id): id is string => id !== null);
         const canvases = await downloadCanvases(sb, node, ancestorIds);
 
+        // Coarse (broken-down) blockers no longer gate once their subtree is
+        // complete; resolve that so the annotation can say which it is.
+        const brokenDownBlockerIds = [
+          ...new Set(
+            asObjArray(context['blockers'])
+              .filter((b) => strField(b, 'status') === 'broken_down')
+              .map((b) => strField(b, 'id'))
+              .filter((id): id is string => id !== null),
+          ),
+        ];
+        const coarseComplete = new Map<string, boolean>();
+        if (brokenDownBlockerIds.length > 0) {
+          const { data: scData, error: scErr } = await sb.rpc('subtree_complete', {
+            p_ids: brokenDownBlockerIds,
+          });
+          if (scErr) throw new CliError(`subtree_complete RPC failed: ${scErr.message}`);
+          for (const row of (scData ?? []) as { id: string; complete: boolean }[]) {
+            coarseComplete.set(row.id, row.complete);
+          }
+        }
+
         if (opts.json) {
           printJson({
             node,
             context,
             messages_by_stage: Object.fromEntries(messagesByStage),
             canvases,
+            coarse_block_complete: Object.fromEntries(coarseComplete),
           });
           return;
         }
 
-        printHuman(node, context, ancestors, messagesByStage, canvases);
+        printHuman(node, context, ancestors, messagesByStage, canvases, coarseComplete);
       }),
     );
 }
@@ -128,6 +150,7 @@ function printHuman(
   ancestors: Obj[],
   messagesByStage: Map<string, MessageRow[]>,
   canvases: CanvasResult[],
+  coarseComplete: Map<string, boolean>,
 ): void {
   console.log(`=== NODE ${node.id} ===`);
   console.log(`Title:   ${node.title}`);
@@ -200,11 +223,16 @@ function printHuman(
   if (blockers.length === 0) console.log('  (none)');
   for (const b of blockers) {
     let line = summarizeNodeish(b);
-    // A broken-down blocker is a coarse, parent-level block: it's hidden from the
-    // graph (its subtasks carry the specific blocks) but still real, so surface it
-    // here in words rather than as an edge the reader can't see.
+    // A broken-down blocker is a coarse, parent-level block: hidden from the
+    // graph but still real. It gates until its whole subtree is complete, then
+    // stops — surface which, in words, rather than as an edge the reader can't see.
     if (strField(b, 'status') === 'broken_down') {
-      line += '  ⟵ coarse parent-level block (broken down; its subtasks carry the specific blocks)';
+      const id = strField(b, 'id');
+      const complete = id !== null ? coarseComplete.get(id) : undefined;
+      line +=
+        complete === true
+          ? '  ⟵ coarse parent-level block (broken down) — subtree complete, no longer gating'
+          : '  ⟵ coarse parent-level block (broken down; subtree still in progress — gating until it completes)';
     }
     console.log(`  ${line}`);
   }

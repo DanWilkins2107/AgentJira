@@ -31,8 +31,9 @@ interface BlockerInfo {
   blocker_id: string;
   blocker_title: string;
   blocker_status: NodeStatus | 'unknown';
-  // For plan variants: false once the blocker's plan has landed (status done
-  // OR merge_sha recorded), even though the blocker itself isn't done.
+  // False once the blocker no longer gates: for plan variants, when its plan has
+  // landed (status done OR merge_sha recorded); for a plain block on a
+  // broken_down source, when that source's subtree is complete.
   unfinished: boolean;
 }
 
@@ -149,20 +150,46 @@ export function registerTasks(program: Command): void {
           }
         }
 
+        // Coarse blocks: a plain firm/soft/reassess_after edge whose source is
+        // broken_down can never reach 'done', so the status rule alone would gate
+        // its target forever. Such a source is instead satisfied when its whole
+        // subtask subtree is complete (no descendant still in a live status).
+        // Resolve that once, in bulk, via the subtree_complete RPC.
+        const subtreeComplete = new Map<string, boolean>();
+        const brokenDownBlockerIds = [...blockerNodes.entries()]
+          .filter(([, b]) => b.status === 'broken_down')
+          .map(([id]) => id);
+        if (brokenDownBlockerIds.length > 0) {
+          const { data: scData, error: scErr } = await sb.rpc('subtree_complete', {
+            p_ids: brokenDownBlockerIds,
+          });
+          if (scErr) throw new CliError(`subtree_complete RPC failed: ${scErr.message}`);
+          for (const row of (scData ?? []) as { id: string; complete: boolean }[]) {
+            subtreeComplete.set(row.id, row.complete);
+          }
+        }
+
         const recommended: TaskEntry[] = [];
         const notRecommended: TaskEntry[] = [];
         for (const n of nodes) {
           const blockers: BlockerInfo[] = (edgesByTarget.get(n.id) ?? []).map((e) => {
             const b = blockerNodes.get(e.source_id);
-            // Plan variants are satisfied once the blocker's plan LANDS (done
-            // OR merge_sha recorded); everything else waits for done. Unknown
-            // blockers count as unfinished.
+            // Plan variants are satisfied once the blocker's plan LANDS (done OR
+            // merge_sha recorded). A plain block on a broken_down source is a
+            // coarse block, satisfied when that source's subtree is complete.
+            // Everything else waits for done. Unknown blockers count as
+            // unfinished; a missing RPC row is the safe default (unfinished).
             const planVariant = e.type === 'firm_block_plan' || e.type === 'soft_block_plan';
-            const unfinished = b
-              ? planVariant
-                ? b.status !== 'done' && b.merge_sha === null
-                : b.status !== 'done'
-              : true;
+            let unfinished: boolean;
+            if (!b) {
+              unfinished = true;
+            } else if (planVariant) {
+              unfinished = b.status !== 'done' && b.merge_sha === null;
+            } else if (b.status === 'broken_down') {
+              unfinished = !(subtreeComplete.get(e.source_id) ?? false);
+            } else {
+              unfinished = b.status !== 'done';
+            }
             return {
               edge_type: e.type,
               blocker_id: e.source_id,
