@@ -17,6 +17,7 @@ stateDiagram-v2
     awaiting_agent_spec : awaiting_agent_spec (agent)
     spec_review : spec_review (human)
     ready_for_pickup : ready_for_pickup (agent)
+    evaluating_soft_block : evaluating_soft_block (agent/judge)
     pr_raised : pr_raised (github)
     pr_changes_requested : pr_changes_requested (agent)
     done : done (none)
@@ -24,29 +25,53 @@ stateDiagram-v2
 
     [*] --> human_braindump_needed : project created (vision node)
     human_braindump_needed --> awaiting_agent_breakdown : human braindumps text + canvas
+
     awaiting_agent_breakdown --> awaiting_human_response : agent asks a question
     awaiting_human_response --> awaiting_agent_breakdown : human answers
     awaiting_agent_breakdown --> split_proposed : agent proposes a split
     awaiting_agent_breakdown --> awaiting_agent_spec : already PR-sized, agent routes to spec
+
     split_proposed --> split_approved : human approves
     split_proposed --> awaiting_agent_breakdown : human rejects
     split_approved --> broken_down : agent materializes children + subtask edges
+
     awaiting_agent_spec --> awaiting_human_response : agent asks a question
     awaiting_human_response --> awaiting_agent_spec : human answers
     awaiting_agent_spec --> spec_review : agent submits tiny spec
     spec_review --> ready_for_pickup : human approves spec
     spec_review --> awaiting_agent_spec : human rejects with review_comment
+
+    ready_for_pickup --> evaluating_soft_block : supervisor queues a soft-blocked node for the judge
+    evaluating_soft_block --> ready_for_pickup : judge proceeds — or defers (reassess_after), held until source done, then re-judged
+    evaluating_soft_block --> awaiting_human_response : judge escalates a question
+    awaiting_human_response --> evaluating_soft_block : human answers, judge re-evaluates
+
     ready_for_pickup --> pr_raised : agent raises PR (GHA pr_opened, aj link-pr)
     pr_raised --> pr_changes_requested : reviewer requests changes / leaves inline comments
     pr_changes_requested --> pr_raised : agent addresses comments, aj resubmit
     pr_raised --> done : GitHub approval, GHA merges, pr_merged
+    pr_raised --> awaiting_agent_breakdown : breakdown_on_merge node — merged plan routes back to split
 
     note right of invalidated
         Reachable from any status via
         invalidate (reason required).
         Kept forever as context.
     end note
+
+    note left of evaluating_soft_block
+        Off-rail side-loop. An external supervisor
+        watches for this status and dispatches a
+        throwaway headless judge session — the board
+        never calls an LLM. A reassess_after edge holds
+        the node like a firm block until its source is
+        done, then it re-enters here to be re-judged.
+    end note
 ```
+
+Two loops in that diagram are easy to miss:
+
+- **The soft-block judge** (`evaluating_soft_block`). A soft-blocked node is queued for an external, throwaway **judge** session that decides: proceed, escalate a question to the human (which returns here for re-judging once answered), or defer via a `reassess_after` edge — which gates the node exactly like a firm block until its source is `done`, then routes it back through the judge. The board never calls an LLM; a deterministic supervisor just watches for the status and dispatches the session. Detail: `agentjira-workflow` rulebook + [architecture.md](architecture.md).
+- **Breakdown-on-merge re-entry** (`pr_raised → awaiting_agent_breakdown`). A node flagged `breakdown_on_merge` delivers a plan/spec document, so its PR merge routes it back to breakdown (recording the `merge_sha`) instead of `done` — the planned work still has to be split into tasks.
 
 Orthogonal to status: **stale** (derived at read time, never stored — an ancestor via subtask edges is currently `invalidated`; the node is dead until that ancestor is restored) and `claimed_by` (an agent session is actively on it; humans clear stuck claims from the UI).
 

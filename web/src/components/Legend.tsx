@@ -53,6 +53,25 @@ export function Legend() {
         <StatusSwatch status="ready_for_pickup" ready />
         <span className="legend-label">green ring — an agent could pick this up now</span>
       </div>
+      <div className="legend-row">
+        <span className="legend-blocked-badge-sample">BLOCKED</span>
+        <span className="legend-label">
+          firm-blocked — waits until the blocker is done (or a broken-down parent's whole subtree
+          completes)
+        </span>
+      </div>
+      <div className="legend-row">
+        <span className="legend-complete-badge-sample">✓ CLEAR</span>
+        <span className="legend-label">
+          broken-down container whose subtree is fully settled — its gates are cleared
+        </span>
+      </div>
+      <div className="legend-row">
+        <span className="legend-soft-badge-sample">soft-blocked</span>
+        <span className="legend-label">
+          shared decision still open upstream — pickable, but a stretch (advisory, not a gate)
+        </span>
+      </div>
       <div className="legend-title" style={{ marginTop: 8 }}>
         Edges
       </div>
@@ -77,6 +96,23 @@ export function Legend() {
           </div>
         )
       })}
+      <div className="legend-row">
+        <svg width="28" height="8" className="legend-edge-sample">
+          <line
+            x1="0"
+            y1="4"
+            x2="28"
+            y2="4"
+            stroke={EDGE_STYLE.firm_block.stroke}
+            strokeWidth={2}
+            strokeDasharray="4 4"
+            opacity={0.55}
+          />
+        </svg>
+        <span className="legend-label">
+          coarse gate (via a broken-down parent) — fades when its subtree completes
+        </span>
+      </div>
       <div className="legend-row">
         <span className="legend-swatch-claimed" />
         <span className="legend-label">claimed by an agent</span>
