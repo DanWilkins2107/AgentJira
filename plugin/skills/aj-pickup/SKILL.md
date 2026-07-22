@@ -33,7 +33,7 @@ Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_appro
 Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parallel when there are several. Give each subagent:
 
 - the **node id**, and the instruction to follow this `aj-pickup` skill's **Working a node** procedure for that one node;
-- a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished.
+- a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished *without* a status change.
 
 Never point two subagents at the same node. When they report back, relay a short summary of what each did. If `aj tasks` showed no agent-turn work, say so and stop — don't invent work or do it yourself.
 
@@ -70,11 +70,11 @@ First invoke the `aj-stage-notes` skill for this node's current status — it lo
 | `awaiting_agent_spec` | Write a tiny, concise spec; `aj submit-spec <node> --file <path>` |
 | `ready_for_pickup` | Follow the `aj-implement` skill: implement and raise the PR |
 
-If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human) — then unclaim and move on.
+If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human, which releases your claim automatically) — then move on.
 
 ## 4. Post results and hand over
 
-When your stage's work is done, the status change (via `aj propose-split`, `aj submit-spec`, `aj set-status`, or the PR/GHA) hands the turn over. Post a short `note` if there's context worth recording:
+When your stage's work is done, the status change (via `aj propose-split`, `aj submit-spec`, `aj set-status`, or the PR/GHA) hands the turn over — and releases your claim with it. Post a short `note` if there's context worth recording:
 
 ```
 aj post <node> --type note --body "..."
@@ -82,7 +82,7 @@ aj post <node> --type note --body "..."
 
 ## 5. Unclaim if stopping unfinished
 
-If you stop for any reason without completing the stage:
+Handing the turn over releases the claim for you. The one case it doesn't cover is stopping mid-stage with the status unchanged — then run:
 
 ```
 aj unclaim <node>

@@ -53,7 +53,7 @@ proposal, which they can approve or reject.
   - The target only needs the blocker's **decision/plan document** → `firm_block_plan` / `soft_block_plan` (satisfied the moment the plan merges, even though the blocker then re-enters breakdown to split its follow-up work).
   - A child whose deliverable **is** a document (decision, design, plan) should be flagged in the proposal as a plan deliverable (`breakdown_on_merge`) — and blocks *from* it should almost always be the `_plan` variants.
 
-  This posts the `split_proposal` message and sets the node to `split_proposed`. It is now the human's turn — stop here and unclaim. Do NOT create children yet.
+  This posts the `split_proposal` message and sets the node to `split_proposed`. It is now the human's turn — stop here; the handoff releases your claim automatically. Do NOT create children yet.
 
 ## Case B — `split_approved`: materialize
 

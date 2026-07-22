@@ -113,7 +113,9 @@ aj context 3f2a1b
 
 ### `aj claim <node> [--session <label>] [--force]` / `aj unclaim <node>`
 
-Claim before working; unclaim when stopping. Default label is `hostname:pid`; pass `--session` for a stable label if you'll run `aj` repeatedly in one working session. Claiming a node already claimed under a *different* label fails unless `--force`. `unclaim` clears both `claimed_by` and `claimed_at`.
+Claim before working; unclaim when stopping mid-stage. Default label is `hostname:pid`; pass `--session` for a stable label if you'll run `aj` repeatedly in one working session. Claiming a node already claimed under a *different* label fails unless `--force`. `unclaim` clears both `claimed_by` and `claimed_at`.
+
+You rarely need `unclaim` explicitly: any status change that hands the turn away from the agent (`spec_review`, `split_proposed`, `awaiting_human_response`, `pr_raised`, `broken_down`, `done`, `invalidated`) clears the claim in the database, whether the write came from `aj` or from the `github-sync` webhook. `unclaim` is for abandoning a node *without* moving its status.
 
 ```sh
 aj claim 3f2a1b --session laptop:feature-x

@@ -79,7 +79,7 @@ This sets the PR fields and status `pr_raised`, covering repos where the GHA isn
 
 From `pr_raised` onward **the GHA owns the node's status**: it reports `pr_opened`, merges on GitHub approval once checks are green, and the report-back flips the node to `done` with the merge SHA (or back to `awaiting_agent_breakdown` for a plan-deliverable node flagged with `breakdown_on_merge`). Do not set the status yourself past this point — with one exception, below. If the PR is closed unmerged, that's for humans/agents to triage on the node.
 
-You can unclaim if you're ending the session, or let the claim stand while the PR is open.
+Reaching `pr_raised` releases your claim automatically — the turn is GitHub's now, and the node shouldn't look held by a session that's about to exit. Nothing to do here.
 
 ## 8. If the review requests changes
 

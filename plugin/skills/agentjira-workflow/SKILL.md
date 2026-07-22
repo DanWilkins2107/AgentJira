@@ -55,7 +55,8 @@ Getting this wrong in the plan direction over-blocks: a plain block from a plan-
 ## Claim etiquette
 
 - **Claim before working**: `aj claim <node>` before touching a node. If it's already claimed, pick something else (don't `--force` unless a human tells you to).
-- **Unclaim when stopping**: if you stop without finishing the stage — for any reason — run `aj unclaim <node>`. A stale claim blocks other agents until a human clears it.
+- **Handoffs release the claim for you**: any status change that hands the turn to the human, to GitHub, or to nobody (`spec_review`, `split_proposed`, `awaiting_human_response`, `pr_raised`, `broken_down`, `done`, `invalidated`) clears the claim automatically. You do **not** need to unclaim after `aj submit-spec`, `aj propose-split`, `aj post --type question`, or raising a PR.
+- **Unclaim when stopping mid-stage**: if you stop without finishing the stage and *without* a status change — for any reason — run `aj unclaim <node>`. That's the one case nothing clears for you, and a stale claim hides the node from other agents until a human clears it.
 - The claim is a flag, not a lock. Behave accordingly.
 
 ## Context is mandatory
