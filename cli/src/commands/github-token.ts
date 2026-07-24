@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Command } from 'commander';
 import { connect } from '../client.js';
 import { CliError, printJson, wrap } from '../output.js';
@@ -7,7 +8,7 @@ interface Opts {
   json?: boolean;
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   token: string;
   expires_at: string | null;
 }
@@ -26,6 +27,23 @@ async function functionErrorMessage(error: unknown): Promise<string> {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Mint a short-lived, repo-scoped GitHub App token for a node via the
+ * github-token Edge Function. Shared by the `github-token` and `gitpush`
+ * commands so the token can be used without ever crossing a shell boundary.
+ */
+export async function mintGithubToken(
+  sb: SupabaseClient,
+  nodeId: string,
+): Promise<TokenResponse> {
+  const { data, error } = await sb.functions.invoke<TokenResponse>('github-token', {
+    body: { node_id: nodeId },
+  });
+  if (error) throw new CliError(await functionErrorMessage(error));
+  if (!data?.token) throw new CliError('no token returned');
+  return data;
+}
+
 export function registerGithubToken(program: Command): void {
   program
     .command('github-token <node>')
@@ -38,11 +56,7 @@ export function registerGithubToken(program: Command): void {
         const { sb } = await connect();
         // Resolve/validate the node client-side first for clear errors.
         const node = await resolveAndFetchNode(sb, nodeRef);
-        const { data, error } = await sb.functions.invoke<TokenResponse>('github-token', {
-          body: { node_id: node.id },
-        });
-        if (error) throw new CliError(await functionErrorMessage(error));
-        if (!data?.token) throw new CliError('no token returned');
+        const data = await mintGithubToken(sb, node.id);
         if (opts.json) {
           printJson(data);
         } else {

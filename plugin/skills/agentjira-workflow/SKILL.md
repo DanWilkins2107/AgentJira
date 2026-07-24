@@ -108,7 +108,7 @@ AgentJira-Node: <node-uuid>
 
 The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR to the node.
 
-Push and open the PR **as the app identity** (`agentjira[bot]`), never as yourself — a human can't approve their own PR, so the app must be the author. Get a token with `aj github-token <node>` and use it for `git push` + `gh pr create` (exact commands in `aj-implement`). After opening, run `aj link-pr <node> --url <u> --number <n>` as a backup. From `pr_raised` onward, the GHA owns the node's status — do not set it yourself.
+Push and open the PR **as the app identity** (`agentjira[bot]`), never as yourself — a human can't approve their own PR, so the app must be the author. Push with `aj gitpush <node>` (mints and uses the token internally); create the PR with `gh pr create` (exact commands in `aj-implement`). After opening, run `aj link-pr <node> --url <u> --number <n>` as a backup. From `pr_raised` onward, the GHA owns the node's status — do not set it yourself.
 
 **When a review requests changes** (or leaves inline comments), the GHA flips the node to `pr_changes_requested` — an agent turn — and posts the review to the thread as a `review_comment`. It shows up in `aj tasks` like any other agent work. Address the comments on the same branch, push as the app identity, then run `aj resubmit <node>` to hand it back to `pr_raised` and re-request the review on GitHub. This is the one status you set yourself between `pr_raised` and `done` — see `aj-implement`.
 

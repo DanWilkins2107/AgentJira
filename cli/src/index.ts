@@ -5,6 +5,7 @@ import { registerClaim } from './commands/claim.js';
 import { registerContext } from './commands/context.js';
 import { registerCreateNode } from './commands/create-node.js';
 import { registerGithubToken } from './commands/github-token.js';
+import { registerGitpush } from './commands/gitpush.js';
 import { registerInvalidate } from './commands/invalidate.js';
 import { registerLinkPr } from './commands/link-pr.js';
 import { registerPost } from './commands/post.js';
@@ -39,6 +40,7 @@ registerSetBreakdownOnMerge(program);
 registerLinkPr(program);
 registerResubmit(program);
 registerGithubToken(program);
+registerGitpush(program);
 registerInvalidate(program);
 registerSearch(program);
 

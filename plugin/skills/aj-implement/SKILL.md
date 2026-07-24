@@ -45,19 +45,24 @@ On merge the node then returns to `awaiting_agent_breakdown` (instead of `done`)
 
 Push and open the PR **as the app identity**, not as yourself. The human reviewer
 can only approve a PR they didn't author, so authorship must be the app
-(`agentjira[bot]`). Mint a short-lived, repo-scoped token and use it for the push
-and PR creation:
+(`agentjira[bot]`). Push with `aj gitpush`, which mints a short-lived,
+repo-scoped token internally and hands it straight to `git push` — the token
+never lands on your command line:
 
 ```
-TOKEN=$(aj github-token <node>)
-git push "https://x-access-token:$TOKEN@github.com/<owner>/<repo>.git" HEAD
-GH_TOKEN=$TOKEN gh pr create --title "[AJ] <node title>" --body "<body below>"
+aj gitpush <node>
+GH_TOKEN=$(aj github-token <node>) gh pr create --title "[AJ] <node title>" --body "<body below>"
 ```
 
-- The token lasts ~1h and is scoped to this project's repo with contents +
-  pull-requests write only. Never print it into the PR, logs, or the node thread.
-- If `aj github-token` reports the app isn't installed on the repo, the operator
-  needs to install the GitHub App there (see `docs/architecture.md`).
+- `aj gitpush <node>` pushes the current branch (`HEAD`) to `origin`'s GitHub
+  repo as `agentjira[bot]`. Use `-u` on the first push of a new branch, and
+  `--force-with-lease` after a rebase; pass an explicit refspec as the second
+  argument if you need one other than `HEAD`.
+- The minted token lasts ~1h and is scoped to this project's repo with contents +
+  pull-requests write only. `aj gitpush` never prints it; when you must mint one
+  for `gh` yourself, never print it into the PR, logs, or the node thread.
+- If `aj gitpush`/`aj github-token` reports the app isn't installed on the repo,
+  the operator needs to install the GitHub App there (see `docs/architecture.md`).
 - Title: `[AJ] <node title>`
 - Body must contain the marker, exactly:
 
@@ -89,11 +94,10 @@ When a reviewer requests changes or leaves inline comments, the GHA flips the no
 
 1. `aj claim <node>` (if not still claimed), then `aj context <node>` — **read the `review_comment`**; it carries the reviewer's summary and inline comments verbatim, so you work from the board, not GitHub.
 2. Check out the PR branch and address every comment (invoke the `code-style-guide` skill and follow it for any code you write). If a comment is wrong or ambiguous, reply on the PR and/or `aj post <node> --type note` rather than guessing.
-3. Push the fixes **as the app identity** (mint a fresh `aj github-token <node>` if the earlier one expired):
+3. Push the fixes **as the app identity** — `aj gitpush` mints a fresh token each run, so an expired earlier one doesn't matter:
 
    ```
-   TOKEN=$(aj github-token <node>)
-   git push "https://x-access-token:$TOKEN@github.com/<owner>/<repo>.git" HEAD
+   aj gitpush <node>
    ```
 
 4. Hand the turn back to review:
