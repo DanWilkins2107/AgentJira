@@ -67,7 +67,7 @@ First invoke the `aj-stage-notes` skill for this node's current status — it lo
 |---|---|
 | `awaiting_agent_breakdown` | Follow the `aj-breakdown` skill: propose a split, or route to spec if PR-sized |
 | `split_approved` | Follow the `aj-breakdown` skill: materialize the approved children |
-| `awaiting_agent_spec` | Write a tiny, concise spec; `aj submit-spec <node> --file <path>` |
+| `awaiting_agent_spec` | Write a tiny, concise spec; `aj submit-spec <node> --file <path>`. If it plans out code, invoke `code-style-guide` and follow it |
 | `ready_for_pickup` | Follow the `aj-implement` skill: implement and raise the PR |
 
 If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human, which releases your claim automatically) — then move on.

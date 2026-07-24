@@ -29,6 +29,8 @@ Work on a fresh git branch in the project's repo (one repo per project), branche
 
 ## 4. Implement per the spec
 
+Invoke the `code-style-guide` skill and follow it while writing the code.
+
 Build exactly what the spec says — no gold-plating, no scope creep. If the spec turns out to be wrong or ambiguous mid-flight, post a question and pause rather than improvising.
 
 ## 5. Raise the PR
@@ -86,7 +88,7 @@ Reaching `pr_raised` releases your claim automatically — the turn is GitHub's 
 When a reviewer requests changes or leaves inline comments, the GHA flips the node to **`pr_changes_requested`** (an agent turn) and posts the review to the thread as a `review_comment`. The node reappears in `aj tasks`, so a fresh session can pick it up — you don't have to be the original author.
 
 1. `aj claim <node>` (if not still claimed), then `aj context <node>` — **read the `review_comment`**; it carries the reviewer's summary and inline comments verbatim, so you work from the board, not GitHub.
-2. Check out the PR branch and address every comment. If a comment is wrong or ambiguous, reply on the PR and/or `aj post <node> --type note` rather than guessing.
+2. Check out the PR branch and address every comment (invoke the `code-style-guide` skill and follow it for any code you write). If a comment is wrong or ambiguous, reply on the PR and/or `aj post <node> --type note` rather than guessing.
 3. Push the fixes **as the app identity** (mint a fresh `aj github-token <node>` if the earlier one expired):
 
    ```

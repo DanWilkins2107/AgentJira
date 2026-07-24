@@ -35,7 +35,7 @@ proposal, which they can approve or reject.
   aj set-status <node> awaiting_agent_spec
   ```
 
-  Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`).
+  Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
 
 - **Bigger than one PR**: propose a split. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
 
