@@ -23,7 +23,7 @@ const program = new Command();
 program
   .name('aj')
   .description('AgentJira agent CLI — work the task graph from the command line')
-  .version('0.1.0');
+  .version('0.2.0');
 
 registerWhoami(program);
 registerProjects(program);

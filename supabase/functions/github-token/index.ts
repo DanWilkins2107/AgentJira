@@ -185,7 +185,14 @@ async function handle(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         repositories: [project.repo_name],
-        permissions: { contents: "write", pull_requests: "write" },
+        permissions: {
+          contents: "write",
+          pull_requests: "write",
+          // Required so branches that add/modify .github/workflows/** can be
+          // pushed — GitHub only grants the scopes this call explicitly asks
+          // for, regardless of what the installation is otherwise allowed.
+          workflows: "write",
+        },
       }),
     },
   );
