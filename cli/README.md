@@ -83,6 +83,8 @@ aj projects
 
 Nodes in the agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block`/`reassess_after` edge targeting it (blocker title + status). A `reassess_after` edge from an unfinished source lands the task in "not recommended", exactly like a firm block — it's deferred for re-judgment until the source resolves.
 
+`human_only_action` is a human turn, so those nodes never appear here at all — they are work no agent can do. A firm block *from* one reads as unfinished until the human marks it `done`, which is exactly right: nothing downstream can move.
+
 **Stale** nodes — an ancestor via subtask edges is currently `invalidated` (derived at read time via the `stale_node_ids` RPC, never stored) — are excluded entirely: they are dead until the invalidated ancestor is restored, at which point they reappear automatically. `aj context` still serves them in full.
 
 Two sections — nothing actionable is ever hidden:
@@ -147,9 +149,12 @@ aj propose-split 3f2a1b --body "1. API schema (firm-blocks 2,3)
 
 Create a node (default status `awaiting_agent_breakdown`). With `--parent`, also creates a `subtask` edge parent → new node. Used when materializing an approved split — afterwards set the parent to `broken_down`. `--breakdown-on-merge` marks a plan-deliverable node up front (see `aj set-breakdown-on-merge`).
 
+`--status human_only_action` splits out work only a person can do — account signup, payment, a third-party dashboard, anything physical. That node never appears in `aj tasks`; the human does it and marks it `done`. Firm-block whatever it holds up with a `firm_block` edge from it, and carry on with other work rather than waiting.
+
 ```sh
 aj create-node -p "My App" --title "API schema" --parent 3f2a1b
 aj create-node -p "My App" --title "Tiny fix" --status awaiting_agent_spec
+aj create-node -p "My App" --title "Create the Stripe account" --status human_only_action
 ```
 
 ### `aj add-edge --type <edge_type> --from <node> --to <node>`

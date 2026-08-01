@@ -8,6 +8,12 @@ import type { TaskNode } from '../lib/types'
  * Matches the CLI default: new nodes start at `awaiting_agent_breakdown` with
  * no parent, so an agent decides how to break them down. The DB triggers log
  * the insert event; we never write events ourselves.
+ *
+ * The human-only checkbox creates the node at `human_only_action` instead: work
+ * no agent can do (accounts, payments, third-party dashboards, anything
+ * physical). Such a node never reaches an agent — you do it and mark it done —
+ * so it is worth putting on the graph the moment you know about it, and blocking
+ * whatever it holds up with a firm_block edge from it.
  */
 export function NewNodeDialog({
   projectId,
@@ -21,6 +27,7 @@ export function NewNodeDialog({
   const { session } = useAuth()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [humanOnly, setHumanOnly] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -38,7 +45,7 @@ export function NewNodeDialog({
         project_id: projectId,
         title: trimmed,
         body: body.trim(),
-        status: 'awaiting_agent_breakdown',
+        status: humanOnly ? 'human_only_action' : 'awaiting_agent_breakdown',
         created_by: session?.user.id ?? null,
       })
       .select()
@@ -56,8 +63,17 @@ export function NewNodeDialog({
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <h3>New node</h3>
         <p className="muted">
-          Starts at <strong>awaiting_agent_breakdown</strong> — an agent picks it up and decides how
-          to break it down. Same as <code>aj create-node</code>.
+          {humanOnly ? (
+            <>
+              Starts at <strong>human_only_action</strong> — no agent will ever touch it. Do the
+              thing, then mark it done. Block whatever it holds up with a firm block from this node.
+            </>
+          ) : (
+            <>
+              Starts at <strong>awaiting_agent_breakdown</strong> — an agent picks it up and decides
+              how to break it down. Same as <code>aj create-node</code>.
+            </>
+          )}
         </p>
         {err ? <div className="form-error">{err}</div> : null}
         <label>
@@ -78,6 +94,14 @@ export function NewNodeDialog({
           onChange={(e) => setBody(e.target.value)}
           placeholder="Body (markdown, optional)…"
         />
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={humanOnly}
+            onChange={(e) => setHumanOnly(e.target.checked)}
+          />
+          Only I can do this — no agent can (account, payment, external dashboard, physical)
+        </label>
         <div className="action-buttons">
           <button className="btn-approve" disabled={busy || !title.trim()} onClick={create}>
             Create node

@@ -9,8 +9,9 @@ import './StageFlow.css'
  * StageFlow — horizontal stepper visualizing the whole canonical pipeline:
  *
  *   human_braindump_needed → awaiting_agent_breakdown → fork:
- *     split path: split_proposed → split_approved → broken_down
- *     spec path:  awaiting_agent_spec → spec_review → ready_for_pickup → pr_raised → done
+ *     split path:      split_proposed → split_approved → broken_down
+ *     spec path:       awaiting_agent_spec → spec_review → ready_for_pickup → pr_raised → done
+ *     human-only path: human_only_action → done
  *
  * awaiting_human_response is a side-loop (off-rail chip anchored at the last
  * on-rail status); invalidated is off-rail too (dims the whole rail).
@@ -28,6 +29,10 @@ const SPEC_STEPS: NodeStatus[] = [
   'pr_raised',
   'done',
 ]
+// A third branch off the same fork, and the shortest one: work only a person
+// can do goes straight from the human to done. No agent stage, so no spec, no
+// PR, and no hand-back — the node is the human's for its whole life.
+const HUMAN_ONLY_STEPS: NodeStatus[] = ['human_only_action', 'done']
 
 export function isNodeStatus(v: unknown): v is NodeStatus {
   return typeof v === 'string' && (NODE_STATUSES as readonly string[]).includes(v)
@@ -101,21 +106,32 @@ export function StageFlow({
 
   const splitTouched = SPLIT_STEPS.some((s) => visitedSet.has(s))
   const specTouched = SPEC_STEPS.some((s) => visitedSet.has(s))
+  const humanOnlyTouched = visitedSet.has('human_only_action')
   // Back at the fork: a spec-stage node was sent back to breakdown, so the
   // branch choice is open again regardless of history — re-show both futures.
   const atOpenFork = node.status === 'awaiting_agent_breakdown'
-  const undecided = atOpenFork || (!splitTouched && !specTouched)
+  const undecided = atOpenFork || (!splitTouched && !specTouched && !humanOnlyTouched)
 
   // The rendered rail. Both branches touched (split then spec — legal): only the
   // split steps actually visited stay on the rail, then the spec branch.
   const rail: NodeStatus[] = useMemo(() => {
     if (atOpenFork) return COMMON_STEPS // fork reopened: render both branches as futures
+    // Human-only wins the branch: this node ends at done by a person's hand, so
+    // whatever agent stages it passed through first are history on the way there.
+    // Usually the node was CREATED human_only_action and the rail is just the two
+    // steps; the filter only has anything to add when it arrived here later.
+    if (humanOnlyTouched) {
+      const priorVisited = [...COMMON_STEPS, ...SPLIT_STEPS, ...SPEC_STEPS].filter(
+        (s) => s !== 'done' && visitedSet.has(s),
+      )
+      return [...priorVisited, ...HUMAN_ONLY_STEPS]
+    }
     if (splitTouched && specTouched)
       return [...COMMON_STEPS, ...SPLIT_STEPS.filter((s) => visitedSet.has(s)), ...SPEC_STEPS]
     if (splitTouched) return [...COMMON_STEPS, ...SPLIT_STEPS]
     if (specTouched) return [...COMMON_STEPS, ...SPEC_STEPS]
-    return COMMON_STEPS // undecided: both branches rendered separately as dimmed futures
-  }, [atOpenFork, splitTouched, specTouched, visitedSet])
+    return COMMON_STEPS // undecided: all branches rendered separately as dimmed futures
+  }, [atOpenFork, humanOnlyTouched, splitTouched, specTouched, visitedSet])
 
   const offRail =
     node.status === 'awaiting_human_response' ||
@@ -179,6 +195,19 @@ export function StageFlow({
             onClick={() => void go(questionReturnTarget(events))}
           >
             Answered — return to agent →
+          </button>
+        )
+      case 'human_only_action':
+        // No hand-back: the node was never an agent's, so finishing it IS the
+        // transition. Anything downstream unblocks off the block edge, as usual.
+        return (
+          <button
+            className="sf-next-btn"
+            style={{ background: color }}
+            disabled={busy}
+            onClick={() => void go('done')}
+          >
+            I've done it — mark done →
           </button>
         )
       case 'split_proposed':
@@ -280,6 +309,7 @@ export function StageFlow({
             <div className="sf-fork">
               <ForkBranch caption="split path" steps={SPLIT_STEPS} />
               <ForkBranch caption="spec path" steps={SPEC_STEPS} />
+              <ForkBranch caption="human-only path" steps={HUMAN_ONLY_STEPS} />
             </div>
           </>
         ) : null}

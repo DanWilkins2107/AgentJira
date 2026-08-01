@@ -33,6 +33,20 @@ Invoke the `code-style-guide` skill and follow it while writing the code.
 
 Build exactly what the contract says — the spec, or (for a spec-less node) its title/body/thread — no gold-plating, no scope creep. If it turns out to be wrong or ambiguous mid-flight, post a question and pause rather than improvising. **If a node routed as spec-less turns out to touch security** (auth, secrets, permissions, RLS, migrations, config), stop and route it back to spec (`aj set-status <node> awaiting_agent_spec`) — that work always warrants the human's eyes on the plan.
 
+### Hit something only a human can do?
+
+Account signup, payment details, a click in a third-party console, physical setup — you cannot do it and no amount of asking changes that. **Do not park this node waiting for the human.** Split the human step out as its own node and firm-block yourself on it:
+
+```
+aj create-node -p <project> --title "<the thing the human must do>" \
+  --body "<exactly what to do, and what it unblocks>" \
+  --parent <this node's parent> --status human_only_action
+aj add-edge --type firm_block --from <new node> --to <this node>
+aj post <node> --type note --body "Blocked on <new node id>: <one line>."
+```
+
+Then finish whatever parts of your node **don't** depend on it and get them into the PR, or `aj unclaim <node>` and pick up other work. Never fake credentials or stub the thing out to keep going unless the contract explicitly says to.
+
 ## 5. Raise the PR
 
 **Plan deliverable?** If this node's PR lands a plan/spec document in the repo rather than working code, flag it **before** the PR merges:

@@ -10,6 +10,7 @@ export const NODE_STATUSES = [
   'awaiting_agent_spec',
   'spec_review',
   'ready_for_pickup',
+  'human_only_action',
   'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
@@ -18,7 +19,9 @@ export const NODE_STATUSES = [
 ] as const;
 export type NodeStatus = (typeof NODE_STATUSES)[number];
 
-/** Statuses where it is the agent's turn to act. */
+/** Statuses where it is the agent's turn to act. `human_only_action` is
+ * deliberately absent: that node is work only a person can do, so it must never
+ * be offered to an agent by `aj tasks`. */
 export const AGENT_TURN_STATUSES: readonly NodeStatus[] = [
   'awaiting_agent_breakdown',
   'split_approved',

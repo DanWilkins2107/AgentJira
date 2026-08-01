@@ -11,6 +11,7 @@ export type NodeStatus =
   | 'awaiting_agent_spec'
   | 'spec_review'
   | 'ready_for_pickup'
+  | 'human_only_action'
   | 'evaluating_soft_block'
   | 'pr_raised'
   | 'pr_changes_requested'
@@ -27,6 +28,7 @@ export const NODE_STATUSES: NodeStatus[] = [
   'awaiting_agent_spec',
   'spec_review',
   'ready_for_pickup',
+  'human_only_action',
   'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
