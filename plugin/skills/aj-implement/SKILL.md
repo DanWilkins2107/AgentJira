@@ -1,11 +1,11 @@
 ---
 name: aj-implement
-description: Procedure for implementing an AgentJira node — claim, load context, branch, implement per the approved spec, raise a PR with the node marker. Use when working a node whose status is ready_for_pickup.
+description: Procedure for implementing an AgentJira node — claim, load context, branch, implement per the node's contract (its approved spec, or its title/body/thread when the spec was skipped), raise a PR with the node marker. Use when working a node whose status is ready_for_pickup.
 ---
 
 # Implementing a node
 
-Follow the `agentjira-workflow` rulebook throughout. A `ready_for_pickup` node has a human-approved spec — that spec is your contract.
+Follow the `agentjira-workflow` rulebook throughout. A `ready_for_pickup` node was cleared to build in one of two ways: it has a **human-approved spec** (that spec is your contract), or the breakdown agent judged it routine enough to **skip the spec** and build directly (look for a `note` message explaining why). A spec-less node's contract is its title, body, and thread context — build what those describe. If that context is too thin to build confidently, don't guess: post a question (`aj post <node> --type question …`) or route it back to spec (`aj set-status <node> awaiting_agent_spec`).
 
 ## 1. Claim
 
@@ -19,7 +19,7 @@ aj claim <node>
 aj context <node>
 ```
 
-Read the spec, the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
+Read the spec **if there is one** (a spec-less node carries its contract in the title, body, and thread instead), the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
 
 Then invoke the `aj-stage-notes` skill for this node's current status (`ready_for_pickup`, or `pr_changes_requested` on a review round) to load any project-specific instructions for this stage (usually none).
 
@@ -27,11 +27,11 @@ Then invoke the `aj-stage-notes` skill for this node's current status (`ready_fo
 
 Work on a fresh git branch in the project's repo (one repo per project), branched from the default branch.
 
-## 4. Implement per the spec
+## 4. Implement per the contract
 
 Invoke the `code-style-guide` skill and follow it while writing the code.
 
-Build exactly what the spec says — no gold-plating, no scope creep. If the spec turns out to be wrong or ambiguous mid-flight, post a question and pause rather than improvising.
+Build exactly what the contract says — the spec, or (for a spec-less node) its title/body/thread — no gold-plating, no scope creep. If it turns out to be wrong or ambiguous mid-flight, post a question and pause rather than improvising. **If a node routed as spec-less turns out to touch security** (auth, secrets, permissions, RLS, migrations, config), stop and route it back to spec (`aj set-status <node> awaiting_agent_spec`) — that work always warrants the human's eyes on the plan.
 
 ## 5. Raise the PR
 

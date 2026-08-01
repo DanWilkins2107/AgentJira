@@ -12,14 +12,14 @@ AgentJira is a graph of task nodes shared between humans and agents. Humans and 
 | Status | Turn | Meaning |
 |---|---|---|
 | `human_braindump_needed` | human | Human must provide direction/context (vision nodes start here) |
-| `awaiting_agent_breakdown` | **agent** | Study context; propose a split, or route to spec if PR-sized |
+| `awaiting_agent_breakdown` | **agent** | Study context; propose a split, or if PR-sized route to spec — or, for routine non-security work where human guidance on the plan wouldn't help, skip the spec straight to `ready_for_pickup` |
 | `awaiting_human_response` | human | Agent asked question(s); human must answer in the thread |
 | `split_proposed` | human | Split proposal posted; human must approve/reject |
 | `split_approved` | **agent** | Materialize child nodes + `subtask` edges, then set parent to `broken_down` |
 | `broken_down` | none | Container node; work continues in children |
 | `awaiting_agent_spec` | **agent** | Node is PR-sized; write a tiny, concise spec |
 | `spec_review` | human | Human approves (→ `ready_for_pickup`) or rejects (→ `awaiting_agent_spec` with a `review_comment`) |
-| `ready_for_pickup` | **agent** | Approved spec; claim and implement |
+| `ready_for_pickup` | **agent** | Cleared to build (approved spec, or a spec-less routine node the breakdown agent sent straight here); claim and implement |
 | `evaluating_soft_block` | **agent** | A soft-blocked node handed to the soft-block **judge** (a separate, supervisor-dispatched session) to decide: proceed, ask the human (→ `awaiting_human_response`), or defer (`reassess_after`). A general pickup agent should normally leave this — it's the judge's job |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; the GHA merges and reports back |
 | `pr_changes_requested` | **agent** | Reviewer requested changes / left inline comments; address them, then `aj resubmit` → `pr_raised` |

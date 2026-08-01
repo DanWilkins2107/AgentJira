@@ -29,7 +29,8 @@ stateDiagram-v2
     awaiting_agent_breakdown --> awaiting_human_response : agent asks a question
     awaiting_human_response --> awaiting_agent_breakdown : human answers
     awaiting_agent_breakdown --> split_proposed : agent proposes a split
-    awaiting_agent_breakdown --> awaiting_agent_spec : already PR-sized, agent routes to spec
+    awaiting_agent_breakdown --> awaiting_agent_spec : PR-sized, spec worthwhile → agent writes spec
+    awaiting_agent_breakdown --> ready_for_pickup : PR-sized + routine (no security) → agent skips the spec, builds
 
     split_proposed --> split_approved : human approves
     split_proposed --> awaiting_agent_breakdown : human rejects
@@ -102,7 +103,7 @@ sequenceDiagram
     Note over Board: broken_down — work continues in the children
 ```
 
-The question loop can repeat as often as needed — regular human intervention is the point, not a failure mode. Children that are already PR-sized skip further splitting and go straight to `awaiting_agent_spec`.
+The question loop can repeat as often as needed — regular human intervention is the point, not a failure mode. Children that are already PR-sized skip further splitting: the agent then judges whether a spec is worthwhile ("would human guidance on the plan help here?") — routine, self-evident work skips straight to `ready_for_pickup` and builds, so the PR review is the human's only gate on it; anything where the plan is worth a look, and **all security-relevant work** (auth, secrets, permissions, RLS, migrations, config), goes through `awaiting_agent_spec` → `spec_review`. This is deliberate load control: the spec gate exists where human guidance adds value, not as a rubber stamp on obvious work.
 
 ## The PR endgame
 

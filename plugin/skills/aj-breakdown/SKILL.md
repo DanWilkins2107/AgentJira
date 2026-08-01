@@ -29,13 +29,26 @@ propose a split, or ask a clarifying question first (`aj post <node> --type ques
 Skipping to spec on a hunch strands the human with no easy way back — prefer the split
 proposal, which they can approve or reject.
 
-- **PR-sized** (one coherent change, one PR): don't split. Route it to spec:
+- **PR-sized** (one coherent change, one PR): don't split. Now decide **whether it needs a spec at all** — the question is *"would the human's guidance on the plan actually be beneficial here?"*, not *"can I get away without one?"*.
 
-  ```
-  aj set-status <node> awaiting_agent_spec
-  ```
+  - **Spec worthwhile** — write one and route to review:
 
-  Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
+    ```
+    aj set-status <node> awaiting_agent_spec
+    ```
+
+    Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
+
+  - **Spec wouldn't add value** — the change is routine and self-evident, human guidance on the plan wouldn't change what you build → skip the spec and go straight to build:
+
+    ```
+    aj set-status <node> ready_for_pickup
+    aj post <node> --type note --body "Skipped spec — <one line: why guidance wouldn't help, e.g. routine UI copy change, no security surface>. Building directly; PR review is the gate."
+    ```
+
+    The node stays your turn, so your claim carries into implementation (`aj-implement`). The PR is then the human's only gate on this work — the note is their breadcrumb for *why* there was no plan.
+
+  **Hard rule — security always gets a spec.** Anything touching auth, secrets, permissions, RLS, database migrations, or configuration is *never* skipped, no matter how small it looks. When in doubt about whether something is security-relevant, write the spec. This is not a judgment call; it is a floor.
 
 - **Bigger than one PR**: propose a split. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
 
