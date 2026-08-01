@@ -23,19 +23,19 @@ export function ThreadsTab({
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Group into *contiguous* runs of the same stage, not one bucket per stage: a
+  // node revisits stages (awaiting_human_response → agent → awaiting_human_response
+  // → …), and keying by stage alone would collapse every visit into a single block,
+  // stacking all the human notes together with the agent replies torn out from
+  // between them. Messages arrive oldest-first; we render newest run first.
   const groups = useMemo(() => {
-    const byStage = new Map<NodeStatus, Message[]>()
+    const runs: { stage: NodeStatus; msgs: Message[] }[] = []
     for (const m of messages) {
-      const list = byStage.get(m.stage)
-      if (list) list.push(m)
-      else byStage.set(m.stage, [m])
+      const current = runs[runs.length - 1]
+      if (current && current.stage === m.stage) current.msgs.push(m)
+      else runs.push({ stage: m.stage, msgs: [m] })
     }
-    // Newest stage group first, by the latest message in each group.
-    return [...byStage.entries()].sort((a, b) => {
-      const lastA = a[1][a[1].length - 1].created_at
-      const lastB = b[1][b[1].length - 1].created_at
-      return lastB.localeCompare(lastA)
-    })
+    return runs.reverse()
   }, [messages])
 
   const offerHandBack = node.status === 'awaiting_human_response' && type === 'answer'
@@ -109,8 +109,9 @@ export function ThreadsTab({
       </form>
 
       {groups.length === 0 ? <p className="muted">No messages yet.</p> : null}
-      {groups.map(([stage, msgs]) => (
-        <div key={stage} className="stage-group card">
+      {groups.map(({ stage, msgs }) => (
+        // Keyed by first message: the same stage can appear in several runs.
+        <div key={msgs[0].id} className="stage-group card">
           <div className="stage-group-head">
             <StatusPill status={stage} />
             <span className="muted">{msgs.length} message{msgs.length === 1 ? '' : 's'}</span>

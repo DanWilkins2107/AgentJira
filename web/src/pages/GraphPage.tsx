@@ -140,7 +140,13 @@ export function GraphPage() {
     // sets above already ran on the full data, so hiding here can't change them.
     const visibleNodes = taskNodes.filter((n) => {
       if (hideInvalidated && invalidSet.has(n.id)) return false
-      if (hideDone && n.status === 'done') return false
+      // "Done" for hiding means terminal, OR a broken_down container whose whole
+      // subtree has settled (completeIds) — such a parent can never itself reach
+      // `done`, but every leaf under it has, so it reads as done and should hide.
+      // Restrict the completeIds branch to broken_down: it also flags invalidated
+      // nodes, which are hideInvalidated's job, not hideDone's.
+      if (hideDone && (n.status === 'done' || (n.status === 'broken_down' && completeIds.has(n.id))))
+        return false
       return true
     })
     const visibleIds = new Set(visibleNodes.map((n) => n.id))

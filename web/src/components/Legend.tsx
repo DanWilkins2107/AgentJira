@@ -51,12 +51,14 @@ export function Legend() {
       </div>
       <div className="legend-row">
         <StatusSwatch status="ready_for_pickup" />
-        <span className="legend-label">full opacity — an agent could pick this up now</span>
+        <span className="legend-label">
+          full opacity — actionable now (pickable, in progress, or awaiting you)
+        </span>
       </div>
       <div className="legend-row">
         <StatusSwatch status="ready_for_pickup" notPickable />
         <span className="legend-label">
-          faded — can't be picked up now (blocked, claimed, settled, or your turn)
+          faded — parked: firm-blocked or settled (nothing to do here now)
         </span>
       </div>
       <div className="legend-row">
@@ -75,7 +77,8 @@ export function Legend() {
       <div className="legend-row">
         <span className="legend-soft-badge-sample">soft-blocked</span>
         <span className="legend-label">
-          shared decision still open upstream — pickable, but a stretch (advisory, not a gate)
+          shared decision still open upstream — pickable, but a stretch (advisory, not a gate;
+          hidden when the node is firm-blocked)
         </span>
       </div>
       <div className="legend-title" style={{ marginTop: 8 }}>

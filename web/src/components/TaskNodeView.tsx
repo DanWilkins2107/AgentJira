@@ -17,7 +17,8 @@ export type TaskFlowNode = Node<
     ready: boolean
     blocked: boolean
     // Advisory only: an upstream soft block's shared decision is still open.
-    // Independent of `blocked`/`ready` — a node can be either and still soft.
+    // Derived independently of `blocked`/`ready`, but only *shown* when the node
+    // isn't firm-blocked — the hard gate is the thing worth reading.
     softBlocked: boolean
     // Present only for broken_down containers: how far its subtree is toward
     // clearing its coarse gates (see lib/pickup.ts), and how many nodes it gates.
@@ -43,9 +44,12 @@ const CONTAINER_DONE_GLOW = '0 0 10px 1px rgba(18, 184, 134, 0.25)'
  *
  * `ready` (derived: an agent could pick this node up right now — see
  * lib/pickup.ts) marks the parallelization frontier. Rather than accent the few
- * pickable cards, we fade the many that can't be picked up: ready cards stay at
- * full opacity, everything else recedes to NOT_PICKABLE_DIM. Invalidated/stale
- * cards keep their own, deeper fade (the `Math.min` below never brightens them).
+ * pickable cards, we fade the ones nobody can act on now: firm-blocked cards
+ * waiting on a gate, and settled cards (done / broken_down / invalidated).
+ * Everything actionable stays at full opacity — pickable (`ready`), in progress
+ * (`claimed_by`), or awaiting a person (human- and github-turn, incl. PR raised).
+ * Invalidated/stale cards keep their own, deeper fade (the `Math.min` below
+ * never brightens them).
  *
  * `blocked` (derived: agent-turn, unclaimed, but held back by an unfinished
  * firm-family gate — see lib/pickup.ts) shows a red BLOCKED badge so it's
@@ -62,6 +66,14 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
   // A fully-settled container gets a green glow to signal its gates are clear;
   // otherwise fall back to the treatment glow (light human-turn cards only).
   const boxShadow = containerComplete ? CONTAINER_DONE_GLOW : treat.glow
+  // Solid = actionable now: pickable, in progress (claimed), or awaiting a
+  // person (human- or github-turn, e.g. PR raised). Everything else is parked —
+  // firm-blocked or settled (done/broken_down/invalidated) — so it recedes.
+  const actionable =
+    data.ready ||
+    task.claimed_by !== null ||
+    meta.turn === 'human' ||
+    meta.turn === 'github'
   return (
     <div
       className="task-node"
@@ -77,9 +89,10 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
             : `2px solid ${treat.borderColor}`,
         color: treat.text,
         boxShadow,
-        // Pickable cards stay solid; everything else recedes so the frontier
-        // reads at a glance. Invalidated/stale keep their deeper dim (Math.min).
-        opacity: data.ready ? 1 : Math.min(treat.dim ?? 1, NOT_PICKABLE_DIM),
+        // Actionable cards keep their natural opacity; parked cards recede so the
+        // actionable set reads at a glance. Invalidated/stale keep their own
+        // deeper dim either way (via treat.dim / Math.min).
+        opacity: actionable ? treat.dim ?? 1 : Math.min(treat.dim ?? 1, NOT_PICKABLE_DIM),
       }}
     >
       <Handle type="target" position={Position.Top} className="task-node-handle" />
@@ -101,7 +114,10 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
         >
           {meta.label}
         </span>
-        {data.softBlocked ? (
+        {/* Advisory only, and only worth saying when nothing harder is already
+            stopping the node: a firm BLOCKED badge supersedes it — "pickable,
+            but a stretch" is misleading on a card that isn't pickable at all. */}
+        {data.softBlocked && !data.blocked ? (
           <span
             className="task-node-soft-badge"
             title="soft-blocked — a shared decision upstream is still open; pickable, but a stretch"
