@@ -17,6 +17,7 @@ stateDiagram-v2
     awaiting_agent_spec : awaiting_agent_spec (agent)
     spec_review : spec_review (human)
     ready_for_pickup : ready_for_pickup (agent)
+    human_only_action : human_only_action (human)
     evaluating_soft_block : evaluating_soft_block (agent/judge)
     pr_raised : pr_raised (github)
     pr_changes_requested : pr_changes_requested (agent)
@@ -42,6 +43,10 @@ stateDiagram-v2
     spec_review --> ready_for_pickup : human approves spec
     spec_review --> awaiting_agent_spec : human rejects with review_comment
 
+    [*] --> human_only_action : split out as its own node — only a person can do it
+    awaiting_agent_breakdown --> human_only_action : agent finds the whole node is human-only
+    human_only_action --> done : human does it and marks it done
+
     ready_for_pickup --> evaluating_soft_block : supervisor queues a soft-blocked node for the judge
     evaluating_soft_block --> ready_for_pickup : judge proceeds — or defers (reassess_after), held until source done, then re-judged
     evaluating_soft_block --> awaiting_human_response : judge escalates a question
@@ -57,6 +62,14 @@ stateDiagram-v2
         Reachable from any status via
         invalidate (reason required).
         Kept forever as context.
+    end note
+
+    note right of human_only_action
+        Work only a person can do. A whole node,
+        never a detour: the agent splits it out and
+        firm-blocks whatever it holds up, rather than
+        parking its own node. No hand-back path —
+        no agent ever held it.
     end note
 
     note left of evaluating_soft_block
@@ -104,6 +117,24 @@ sequenceDiagram
 ```
 
 The question loop can repeat as often as needed — regular human intervention is the point, not a failure mode. Children that are already PR-sized skip further splitting: the agent then judges whether a spec is worthwhile ("would human guidance on the plan help here?") — routine, self-evident work skips straight to `ready_for_pickup` and builds, so the PR review is the human's only gate on it; anything where the plan is worth a look, and **all security-relevant work** (auth, secrets, permissions, RLS, migrations, config), goes through `awaiting_agent_spec` → `spec_review`. This is deliberate load control: the spec gate exists where human guidance adds value, not as a rubber stamp on obvious work.
+
+## Human-only work
+
+Some work is blocked on being a person: creating an account, paying for something, clicking through a third-party console, plugging in hardware, signing a document. No amount of context unblocks it, so it does not belong in an agent's queue at all.
+
+The rule is **split it out, don't wait on it**. The human-only step becomes its own node in `human_only_action`, and whatever it holds up is firm-blocked by that node — the same dependency machinery as everything else. An agent never parks its own node hoping a human wanders past.
+
+```mermaid
+flowchart LR
+    spot["breakdown / spec:<br/>spot the human-only step"] --> split["create it as its own node<br/>status = human_only_action"]
+    split --> block["firm_block: human node → the work it holds up"]
+    block --> human["human does it, marks it done"]
+    human --> unblock["dependent node unblocks<br/>by the ordinary edge rule — no cascade"]
+```
+
+- **Predict them, don't discover them.** Breakdown and spec are where these steps are cheap to spot, and a split proposal should name the human-only children explicitly. Running into one mid-implementation is the fallback: the agent splits it out, blocks its own node on it, and goes and does something else rather than stalling.
+- **The whole node is the human's, start to finish.** There is no hand-back, because no agent ever held it. The human marks it `done` — or `invalidated` if it turns out to be unnecessary.
+- **It is loud on purpose.** Bright red card, never listed by `aj tasks`, and any firm block from it reads as unfinished everywhere until the human acts. That is exactly the truth: nothing downstream can move.
 
 ## The PR endgame
 

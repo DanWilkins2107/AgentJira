@@ -20,6 +20,7 @@ AgentJira is a graph of task nodes shared between humans and agents. Humans and 
 | `awaiting_agent_spec` | **agent** | Node is PR-sized; write a tiny, concise spec |
 | `spec_review` | human | Human approves (→ `ready_for_pickup`) or rejects (→ `awaiting_agent_spec` with a `review_comment`) |
 | `ready_for_pickup` | **agent** | Cleared to build (approved spec, or a spec-less routine node the breakdown agent sent straight here); claim and implement |
+| `human_only_action` | human | Work only a person can do (account, payment, external dashboard, physical). Never yours — the human does it and marks it `done`. See "Human-only work" below |
 | `evaluating_soft_block` | **agent** | A soft-blocked node handed to the soft-block **judge** (a separate, supervisor-dispatched session) to decide: proceed, ask the human (→ `awaiting_human_response`), or defer (`reassess_after`). A general pickup agent should normally leave this — it's the judge's job |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; the GHA merges and reports back |
 | `pr_changes_requested` | **agent** | Reviewer requested changes / left inline comments; address them, then `aj resubmit` → `pr_raised` |
@@ -55,7 +56,7 @@ Getting this wrong in the plan direction over-blocks: a plain block from a plan-
 ## Claim etiquette
 
 - **Claim before working**: `aj claim <node>` before touching a node. If it's already claimed, pick something else (don't `--force` unless a human tells you to).
-- **Handoffs release the claim for you**: any status change that hands the turn to the human, to GitHub, or to nobody (`spec_review`, `split_proposed`, `awaiting_human_response`, `pr_raised`, `broken_down`, `done`, `invalidated`) clears the claim automatically. You do **not** need to unclaim after `aj submit-spec`, `aj propose-split`, `aj post --type question`, or raising a PR.
+- **Handoffs release the claim for you**: any status change that hands the turn to the human, to GitHub, or to nobody (`spec_review`, `split_proposed`, `awaiting_human_response`, `human_only_action`, `pr_raised`, `broken_down`, `done`, `invalidated`) clears the claim automatically. You do **not** need to unclaim after `aj submit-spec`, `aj propose-split`, `aj post --type question`, or raising a PR.
 - **Unclaim when stopping mid-stage**: if you stop without finishing the stage and *without* a status change — for any reason — run `aj unclaim <node>`. That's the one case nothing clears for you, and a stale claim hides the node from other agents until a human clears it.
 - The claim is a flag, not a lock. Behave accordingly.
 
@@ -75,6 +76,35 @@ aj post <node> --type question --body "..."
 ```
 
 This flips the node to `awaiting_human_response` — regular human intervention is a feature of this system, not a failure. A cheap question now beats an invalidated subtree later.
+
+## Human-only work — split it out, never wait on it
+
+Some work is blocked on being a person, not on information: creating an account, entering payment details, clicking through a third-party console, plugging in hardware, signing something. You will never be able to do it, no matter how much context you gather.
+
+**A human-only step is always its own node** in `human_only_action`, and the work it holds up is firm-blocked by that node. Never park your own node hoping a human will act on it and hand it back — that is not what this status is.
+
+**Question vs human-only action** — the two are different tools:
+
+| You need… | Do this | Turn comes back to you? |
+|---|---|---|
+| information or a decision | `aj post <node> --type question` → `awaiting_human_response` | yes, on the same node |
+| a **thing done** that only a person can do | split out a `human_only_action` node | no — that node is the human's, end to end |
+
+**Spot these at breakdown and spec time.** That is where they are cheap to predict, and naming them in the split proposal means the human sees their own queue from the start. Hitting one mid-implementation is the fallback, not the plan.
+
+When you do hit one mid-work:
+
+```
+aj create-node -p <project> --title "<the thing the human must do>" \
+  --body "<what exactly, and what it unblocks>" \
+  --parent <your node's parent> --status human_only_action
+aj add-edge --type firm_block --from <new node> --to <your node>
+aj post <your node> --type note --body "Blocked on <new node id>: <one line>."
+```
+
+Then **go and do something else** — `aj unclaim <your node>` if you're stopping there. Don't sit waiting, and don't work around it by faking credentials or stubbing the thing out unless the node's contract says to. If the *whole* node turns out to be human-only, just move it: `aj set-status <node> human_only_action`.
+
+Write the body so a human with no context can act on it: the exact thing to do, where, and what it unblocks. A `human_only_action` node ends when the human marks it `done`; nothing hands back to you, and your node unblocks by the ordinary firm-block rule.
 
 ## Brevity — write the least that works
 

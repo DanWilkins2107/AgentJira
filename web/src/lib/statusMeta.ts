@@ -18,6 +18,10 @@ export const STATUS_META: Record<NodeStatus, StatusMeta> = {
   awaiting_human_response: { color: '#ff9800', alpha: 1, turn: 'human', label: 'Awaiting human response' },
   split_proposed: { color: '#ffc107', alpha: 1, turn: 'human', label: 'Split proposed' },
   spec_review: { color: '#cddc39', alpha: 1, turn: 'human', label: 'Spec review' },
+  // Bright red: no agent can ever move this one, so it is the loudest card on
+  // the board. (Red also strokes firm_block edges — different visual channel:
+  // card fill vs edge line, and the legend teaches both.)
+  human_only_action: { color: '#fa5252', alpha: 1, turn: 'human', label: 'Human only action' },
   awaiting_agent_breakdown: { color: '#5c7cfa', alpha: 1, turn: 'agent', label: 'Awaiting agent breakdown' },
   split_approved: { color: '#4263eb', alpha: 1, turn: 'agent', label: 'Split approved' },
   awaiting_agent_spec: { color: '#22b8cf', alpha: 1, turn: 'agent', label: 'Awaiting agent spec' },

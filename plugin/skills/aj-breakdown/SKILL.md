@@ -50,14 +50,23 @@ proposal, which they can approve or reject.
 
   **Hard rule — security always gets a spec.** Anything touching auth, secrets, permissions, RLS, database migrations, or configuration is *never* skipped, no matter how small it looks. When in doubt about whether something is security-relevant, write the spec. This is not a judgment call; it is a floor.
 
+- **Human-only** (no agent could ever do it — account signup, payment, third-party dashboard, physical setup): it is not a spec candidate at all. If the *whole* node is human-only, move it and stop:
+
+  ```
+  aj set-status <node> human_only_action
+  ```
+
+  More often only *part* of the work is human-only — then it becomes one of the children of your split (below), not a detour on an agent node.
+
 - **Bigger than one PR**: propose a split. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
 
   ```
   aj propose-split <node> --body "1. <child title> — <one-line scope>
   2. <child title> — <one-line scope>
   3. <child title> — <one-line scope> (plan deliverable: decision doc, breakdown_on_merge)
+  4. <child title> — <one-line scope> (HUMAN-ONLY: only you can do this)
 
-  Edges: 1 firm-blocks 2 (2 builds on 1's schema); 3 plan-firm-blocks 1 and 2 (they need 3's decision, not its follow-up work); 1 soft-blocks 3 (shared naming decisions)."
+  Edges: 1 firm-blocks 2 (2 builds on 1's schema); 3 plan-firm-blocks 1 and 2 (they need 3's decision, not its follow-up work); 1 soft-blocks 3 (shared naming decisions); 4 firm-blocks 2 (2 can't run without the account)."
   ```
 
   **For every proposed block, name the variant and say why** — the human approves the edges too:
@@ -65,6 +74,8 @@ proposal, which they can approve or reject.
   - The target needs the blocker **built and merged** → `firm_block` / `soft_block`.
   - The target only needs the blocker's **decision/plan document** → `firm_block_plan` / `soft_block_plan` (satisfied the moment the plan merges, even though the blocker then re-enters breakdown to split its follow-up work).
   - A child whose deliverable **is** a document (decision, design, plan) should be flagged in the proposal as a plan deliverable (`breakdown_on_merge`) — and blocks *from* it should almost always be the `_plan` variants.
+
+  **Name the human-only children.** Splitting is the cheapest place to notice work no agent can do — accounts, payments, third-party dashboards, anything physical. Give each one its own numbered child marked HUMAN-ONLY, and firm-block whatever it holds up. Doing this here means the human sees their own queue up front instead of an agent hitting the wall days later. Err toward flagging: a mis-flagged child costs the human one status change, an un-flagged one strands an agent.
 
   This posts the `split_proposal` message and sets the node to `split_proposed`. It is now the human's turn — stop here; the handoff releases your claim automatically. Do NOT create children yet.
 
@@ -78,7 +89,7 @@ The human approved the proposal (read the thread — their `split_decision` mess
    aj create-node -p <project> --title "<child title>" --body "<one-line scope>" --parent <node>
    ```
 
-   This creates the node plus the `subtask` edge from the parent. Default status `awaiting_agent_breakdown` is correct — children that are obviously PR-sized can be created with `--status awaiting_agent_spec` instead. A child the proposal marked as a **plan deliverable** (its PR will land a decision/plan document) gets `--breakdown-on-merge` so its merge routes it back to breakdown instead of `done`.
+   This creates the node plus the `subtask` edge from the parent. Default status `awaiting_agent_breakdown` is correct — children that are obviously PR-sized can be created with `--status awaiting_agent_spec` instead. A child the proposal marked as a **plan deliverable** (its PR will land a decision/plan document) gets `--breakdown-on-merge` so its merge routes it back to breakdown instead of `done`. A child the proposal marked **HUMAN-ONLY** is created with `--status human_only_action` — it goes straight to the human's queue and never enters yours.
 
 2. Add the proposed **sibling** blocks — only blocks _between the new children_:
 
