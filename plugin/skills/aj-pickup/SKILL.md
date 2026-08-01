@@ -11,6 +11,8 @@ Follow the `agentjira-workflow` rulebook throughout.
 
 A general "pick up AgentJira work" request (no specific node named) makes you an **orchestrator**. Your entire job is to find candidate nodes and hand each to a **subagent** that does the actual work. You **never** claim, load context, break down, spec, implement, or raise a PR yourself — if you catch yourself running `aj claim` / `aj context` or editing repo files, stop: that's a subagent's job. Listing, choosing, and dispatching is all you do.
 
+**Pick up everything you can, in parallel.** Default is one subagent per actionable node, all dispatched at once — not one node at a time. Don't cherry-pick a single "best" task and leave the rest sitting; if six nodes are actionable, spawn six subagents. Only leave a node alone when it's genuinely not pickable (see step 2). Then keep watching the board (step 4) and dispatch again as work appears.
+
 > **Already handed one specific node?** If an orchestrator dispatched you to a single node id, you *are* the subagent: skip the orchestrator steps, go straight to **Working a node** below, do it directly, and never spawn a further subagent.
 
 ## Orchestrator — step 1: list available work
@@ -40,6 +42,24 @@ Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parall
 - a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished *without* a status change.
 
 Never point two subagents at the same node. When they report back, relay a short summary of what each did. If `aj tasks` showed no agent-turn work, say so and stop — don't invent work or do it yourself.
+
+## Orchestrator — step 4: monitor the board
+
+Subagents keep running for a while, and their status changes unblock other nodes. Arm a persistent Monitor right after dispatching so new agent-turn work reaches you instead of waiting for the next manual `aj tasks`:
+
+```bash
+prev=""
+while true; do
+  cur=$(aj tasks 2>/dev/null | awk '/^RECOMMENDED/{r=1;next} /^NOT RECOMMENDED/{r=0} r && /^  [^ ]/ && !/\(none\)/{print "NEW" $0}' | sort)
+  [ -n "$prev" ] && comm -13 <(echo "$prev") <(echo "$cur")
+  prev="$cur"
+  sleep 60
+done
+```
+
+Run it with `persistent: true` and a description like `AgentJira board — new actionable nodes`. First pass seeds the baseline silently; after that each line is a node that became actionable.
+
+When it fires: re-run `aj tasks`, apply step 2's judgment, and dispatch subagents for whatever is now pickable. Keep doing this until the board has no agent-turn work left and no subagent is still running, then `TaskStop` the monitor and report.
 
 ---
 
