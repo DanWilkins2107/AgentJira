@@ -13,3 +13,4 @@ supabase/.branches/
 coverage/
 *.tsbuildinfo
 envkey.pem
+.worktrees
