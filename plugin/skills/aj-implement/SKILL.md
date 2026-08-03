@@ -23,6 +23,8 @@ Read the spec **if there is one** (a spec-less node carries its contract in the 
 
 Then invoke the `aj-stage-notes` skill for this node's current status (`ready_for_pickup`, or `pr_changes_requested` on a review round) to load any project-specific instructions for this stage (usually none).
 
+Before writing the PR body or a question, invoke the `aj-examples` skill and read that artifact's file. A filled-in file governs its format and length.
+
 ## 3. Branch
 
 Work on a fresh git branch in the project's repo (one repo per project), branched from the default branch.
@@ -87,6 +89,8 @@ GH_TOKEN=$(aj github-token <node>) gh pr create --title "[AJ] <node title>" --bo
   ```
 
 The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR back to the node.
+
+The marker block is fixed. **The rest of the body is yours, and it's what the reviewer actually reads** — invoke the `aj-examples` skill and read `examples/pr-body.md` before writing it; a filled-in file sets the length budget and section shape.
 
 ## 6. Link as backup
 

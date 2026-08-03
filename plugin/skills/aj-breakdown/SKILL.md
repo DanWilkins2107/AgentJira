@@ -17,6 +17,8 @@ Read the full dump **and the downloaded canvas PNGs** (the node's and its ancest
 
 Then invoke the `aj-stage-notes` skill for this node's current status (`awaiting_agent_breakdown` or `split_approved`) to load any project-specific instructions for this stage (usually none).
 
+Before writing anything to the board, invoke the `aj-examples` skill and read the file for the artifact you're about to produce — `examples/split-proposal.md`, `examples/spec.md`, `examples/question.md`. A filled-in file governs its format and length.
+
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
 **Re-entry from a merged plan?** If the node has `breakdown_on_merge` set and a merged PR (`merge_sha` set, PR linked), it just landed a plan/spec document in the repo and was routed back here to split that work. Read the merged document in the project repo — it is the primary input; propose the split it implies (and question it if it conflicts with the board context).
@@ -37,7 +39,7 @@ proposal, which they can approve or reject.
     aj set-status <node> awaiting_agent_spec
     ```
 
-    Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
+    Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). Read `examples/spec.md` via the `aj-examples` skill first — it sets the project's length budget and shape. When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
 
   - **Spec wouldn't add value** — the change is routine and self-evident, human guidance on the plan wouldn't change what you build → skip the spec and go straight to build:
 
@@ -58,7 +60,7 @@ proposal, which they can approve or reject.
 
   More often only *part* of the work is human-only — then it becomes one of the children of your split (below), not a detour on an agent node.
 
-- **Bigger than one PR**: propose a split. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
+- **Bigger than one PR**: propose a split. Read `examples/split-proposal.md` via the `aj-examples` skill first. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
 
   ```
   aj propose-split <node> --body "1. <child title> — <one-line scope>
