@@ -21,9 +21,7 @@ aj context <node>
 
 Read the spec **if there is one** (a spec-less node carries its contract in the title, body, and thread instead), the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
 
-Then invoke the `aj-stage-notes` skill for this node's current status (`ready_for_pickup`, or `pr_changes_requested` on a review round) to load any project-specific instructions for this stage (usually none).
-
-Before writing the PR body or a question, invoke the `aj-examples` skill and read that artifact's file. A filled-in file governs its format and length.
+Then invoke the stage-notes skill for this node's current status — `aj-stage-notes-ready-for-pickup`, or `aj-stage-notes-pr-changes-requested` on a review round — to load this project's instructions for the stage, including how long the PR body should be.
 
 ## 3. Branch
 
@@ -90,7 +88,7 @@ GH_TOKEN=$(aj github-token <node>) gh pr create --title "[AJ] <node title>" --bo
 
 The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR back to the node.
 
-The marker block is fixed. **The rest of the body is yours, and it's what the reviewer actually reads** — invoke the `aj-examples` skill and read `examples/pr-body.md` before writing it; a filled-in file sets the length budget and section shape.
+The marker block is fixed. **The rest of the body is yours, and it's what the reviewer actually reads** — keep it to the budget set by `aj-stage-notes-ready-for-pickup` (loaded in step 2).
 
 ## 6. Link as backup
 

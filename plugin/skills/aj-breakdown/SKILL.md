@@ -15,9 +15,7 @@ aj context <node>
 
 Read the full dump **and the downloaded canvas PNGs** (the node's and its ancestors') — the human's braindump often lives on the canvas. Check invalidated ancestors: their reasons tell you which directions are already dead (a **stale** node — ancestor currently invalidated — is itself dead until that ancestor is restored). If the direction is unclear, ask now (`aj post <node> --type question --body "..."`) rather than proposing a split built on guesses.
 
-Then invoke the `aj-stage-notes` skill for this node's current status (`awaiting_agent_breakdown` or `split_approved`) to load any project-specific instructions for this stage (usually none).
-
-Before writing anything to the board, invoke the `aj-examples` skill and read the file for the artifact you're about to produce — `examples/split-proposal.md`, `examples/spec.md`, `examples/question.md`. A filled-in file governs its format and length.
+Then invoke the stage-notes skill for this node's current status — `aj-stage-notes-awaiting-agent-breakdown` or `aj-stage-notes-split-approved` — to load this project's instructions for the stage. Do it before you write anything to the board: the notes govern the format and length of what you produce.
 
 ## Case A — `awaiting_agent_breakdown`: propose or route
 
@@ -39,7 +37,7 @@ proposal, which they can approve or reject.
     aj set-status <node> awaiting_agent_spec
     ```
 
-    Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). Read `examples/spec.md` via the `aj-examples` skill first — it sets the project's length budget and shape. When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
+    Then write the tiny, concise spec and `aj submit-spec <node> --file <path>` (→ `spec_review`). Invoke `aj-stage-notes-awaiting-agent-spec` first — it sets the project's length budget and shape. When the spec plans out code, invoke the `code-style-guide` skill and let it shape what you specify.
 
   - **Spec wouldn't add value** — the change is routine and self-evident, human guidance on the plan wouldn't change what you build → skip the spec and go straight to build:
 
@@ -60,7 +58,7 @@ proposal, which they can approve or reject.
 
   More often only *part* of the work is human-only — then it becomes one of the children of your split (below), not a detour on an agent node.
 
-- **Bigger than one PR**: propose a split. Read `examples/split-proposal.md` via the `aj-examples` skill first. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
+- **Bigger than one PR**: propose a split. Keep it concise — numbered children, **one line of scope each**, plus suggested blocking edges between siblings:
 
   ```
   aj propose-split <node> --body "1. <child title> — <one-line scope>

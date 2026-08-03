@@ -75,7 +75,7 @@ If direction is ambiguous, ask **early** via:
 aj post <node> --type question --body "..."
 ```
 
-This flips the node to `awaiting_human_response` — regular human intervention is a feature of this system, not a failure. A cheap question now beats an invalidated subtree later. See `examples/question.md` (`aj-examples`) for how the project wants questions framed.
+This flips the node to `awaiting_human_response` — regular human intervention is a feature of this system, not a failure. A cheap question now beats an invalidated subtree later.
 
 ## Human-only work — split it out, never wait on it
 
@@ -112,7 +112,7 @@ Every word you put on the board is read by a human. **Shorter is always better.*
 
 **Specs especially.** A node at `awaiting_agent_spec` is already PR-sized; the spec is a handful of tight bullets — what to build, where, acceptance criteria — never an essay. Submit with `aj submit-spec <node> --file <path>` (or `--body`), which sets `spec_review`.
 
-**The project may have set the bar for you.** Before writing a spec, split proposal, PR body, or question, invoke the `aj-examples` skill and read `examples/<artifact>.md`. A filled-in file gives you a length budget and a worked example; match it. A blank one (`<!-- AJ-EXAMPLE:EMPTY -->`), or an artifact with no file at all, means this rule is your only guide.
+**The project may have set the bar for you.** The `aj-stage-notes-<status>` skill for the stage you're working carries this project's length budget, and often a worked long-vs-short example. Load it before you write and match it.
 
 ## Plan-deliverable nodes — breakdown on merge
 
@@ -138,7 +138,7 @@ Implements AgentJira node: <web-app-url>/n/<node-uuid>
 AgentJira-Node: <node-uuid>
 ```
 
-The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR to the node. The marker is fixed; **everything else in the body is yours to keep short** — read `examples/pr-body.md` via the `aj-examples` skill before writing it.
+The GHA greps `AgentJira-Node: <uuid>` (last occurrence wins) to link the PR to the node. The marker is fixed; **everything else in the body is yours to keep short** — the `aj-stage-notes-ready-for-pickup` skill sets this project's budget for it.
 
 Push and open the PR **as the app identity** (`agentjira[bot]`), never as yourself — a human can't approve their own PR, so the app must be the author. Push with `aj gitpush <node>` (mints and uses the token internally); create the PR with `gh pr create` (exact commands in `aj-implement`). After opening, run `aj link-pr <node> --url <u> --number <n>` as a backup. From `pr_raised` onward, the GHA owns the node's status — do not set it yourself.
 

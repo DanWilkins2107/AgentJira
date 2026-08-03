@@ -85,7 +85,7 @@ Read everything it prints, and **Read the downloaded canvas PNG file paths** it 
 
 ## 3. Do the stage-appropriate work
 
-First invoke the `aj-stage-notes` skill for this node's current status — it loads any project-specific instructions for this stage (usually none). Then:
+First invoke the stage-notes skill for this node's current status — `aj-stage-notes-<status>`, with the status kebab-cased (`awaiting_agent_spec` → `aj-stage-notes-awaiting-agent-spec`). It loads this project's instructions for the stage, including the length budget for whatever you're about to write. Then:
 
 | Status | What to do |
 |---|---|
@@ -93,8 +93,6 @@ First invoke the `aj-stage-notes` skill for this node's current status — it lo
 | `split_approved` | Follow the `aj-breakdown` skill: materialize the approved children |
 | `awaiting_agent_spec` | Write a tiny, concise spec; `aj submit-spec <node> --file <path>`. If it plans out code, invoke `code-style-guide` and follow it |
 | `ready_for_pickup` | Follow the `aj-implement` skill: implement and raise the PR |
-
-Before writing a spec, split proposal, PR body, or question, invoke the `aj-examples` skill and read that artifact's file — it sets the project's format and length.
 
 If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human, which releases your claim automatically) — then move on.
 
