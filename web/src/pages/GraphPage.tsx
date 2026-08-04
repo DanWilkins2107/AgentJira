@@ -120,8 +120,9 @@ export function GraphPage() {
 
     // Derived, never persisted: the nodes an agent could pick up right now (the
     // parallelization frontier) and, disjointly, those held back purely by an
-    // unfinished firm-family gate. Both computed on the FULL sets so blockers
-    // are all present, then read per-node below. Mirror `aj tasks`.
+    // unfinished firm-family gate — the blocked set also covers human-turn
+    // nodes, which `aj tasks` never lists. Both computed on the FULL sets so
+    // blockers are all present, then read per-node below.
     const readySet = readyToPickupIds(taskNodes, taskEdges, invalidSet)
     const blockedSet = blockedFromPickupIds(taskNodes, taskEdges, invalidSet)
     // Advisory soft-block tag — orthogonal to ready/blocked (mirrors aj tasks).

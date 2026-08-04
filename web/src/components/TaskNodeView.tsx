@@ -51,9 +51,12 @@ const CONTAINER_DONE_GLOW = '0 0 10px 1px rgba(18, 184, 134, 0.25)'
  * Invalidated/stale cards keep their own, deeper fade (the `Math.min` below
  * never brightens them).
  *
- * `blocked` (derived: agent-turn, unclaimed, but held back by an unfinished
- * firm-family gate — see lib/pickup.ts) shows a red BLOCKED badge so it's
- * obvious the node is sitting idle on purpose. Ready and blocked are disjoint,
+ * `blocked` (derived: agent- OR human-turn, unclaimed, but held back by an
+ * unfinished firm-family gate — see lib/pickup.ts) shows a red BLOCKED badge
+ * and fades the card, so it's obvious the node is sitting idle on purpose. It
+ * overrides the human-turn brightness: a gated `human_only_action` (or spec
+ * review, or open question) is not the person's turn yet, and a loud red card
+ * that can't be acted on is worse than no card. Ready and blocked are disjoint,
  * and blocked nodes are never stale, so at most one corner badge shows.
  */
 export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
@@ -64,16 +67,24 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
   const container = data.container
   const containerComplete = container?.complete ?? false
   // A fully-settled container gets a green glow to signal its gates are clear;
-  // otherwise fall back to the treatment glow (light human-turn cards only).
-  const boxShadow = containerComplete ? CONTAINER_DONE_GLOW : treat.glow
+  // otherwise fall back to the treatment glow (light human-turn cards only) —
+  // except when firm-gated, where the glow would fight the fade below.
+  const boxShadow = containerComplete
+    ? CONTAINER_DONE_GLOW
+    : data.blocked
+      ? undefined
+      : treat.glow
   // Solid = actionable now: pickable, in progress (claimed), or awaiting a
   // person (human- or github-turn, e.g. PR raised). Everything else is parked —
   // firm-blocked or settled (done/broken_down/invalidated) — so it recedes.
+  // `blocked` wins over all of it: a firm gate parks the card whoever holds it,
+  // so gated human-turn cards fade instead of shouting for attention.
   const actionable =
-    data.ready ||
-    task.claimed_by !== null ||
-    meta.turn === 'human' ||
-    meta.turn === 'github'
+    !data.blocked &&
+    (data.ready ||
+      task.claimed_by !== null ||
+      meta.turn === 'human' ||
+      meta.turn === 'github')
   return (
     <div
       className="task-node"

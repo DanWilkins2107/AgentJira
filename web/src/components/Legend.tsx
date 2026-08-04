@@ -65,7 +65,8 @@ export function Legend() {
         <span className="legend-blocked-badge-sample">BLOCKED</span>
         <span className="legend-label">
           firm-blocked — waits until the blocker is done (or a broken-down parent's whole subtree
-          completes)
+          completes). Applies to your cards too: a gated human-only action or spec review fades
+          until the gate clears
         </span>
       </div>
       <div className="legend-row">

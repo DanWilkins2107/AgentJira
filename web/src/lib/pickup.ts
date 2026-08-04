@@ -157,11 +157,16 @@ export function readyToPickupIds(
 }
 
 /**
- * Node ids that WOULD be pickup-able but are held back purely by an unfinished
- * firm-family gate — the exact reason they're "not getting picked up". The
- * complement of `readyToPickupIds` within {agent-turn, not stale, not claimed}:
- * same three preconditions, but firmly gated instead of clear. Ready and
- * blocked are therefore disjoint.
+ * Node ids nobody should pick up yet because an unfinished firm-family gate
+ * holds them — the exact reason they're sitting idle. Covers BOTH turns that
+ * can act on a node: agent-turn (the complement of `readyToPickupIds` within
+ * {agent-turn, not stale, not claimed} — so ready and blocked are disjoint)
+ * and human-turn, including `human_only_action`. A gate is a gate whoever
+ * holds the node: doing the work early is wasted either way, so the card must
+ * read as parked rather than as the loudest thing on the board.
+ *
+ * Wider than `aj tasks`, which lists agent-turn statuses only — the human view
+ * is the only place human-turn gating is visible at all.
  *
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
@@ -173,7 +178,8 @@ export function blockedFromPickupIds(
   const gated = firmlyGatedTargets(nodes, edges)
   const blocked = new Set<string>()
   for (const n of nodes) {
-    if (STATUS_META[n.status].turn !== 'agent') continue
+    const turn = STATUS_META[n.status].turn
+    if (turn !== 'agent' && turn !== 'human') continue
     if (invalidSet.has(n.id)) continue // invalidated or stale
     if (n.claimed_by !== null) continue // already in flight
     if (!gated.has(n.id)) continue

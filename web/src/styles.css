@@ -362,7 +362,11 @@ label {
   border-radius: 4px;
   padding: 2px 6px;
   line-height: 1.2;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  /* Dark ring so the red badge still separates on a bright red human-turn card
+     (human_only_action) — invisible against the dark agent-turn cards. */
+  box-shadow:
+    0 0 0 1.5px rgba(26, 27, 30, 0.9),
+    0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .task-node-complete-badge {
   position: absolute;
