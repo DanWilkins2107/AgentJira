@@ -220,6 +220,12 @@ export function GraphPage() {
         id: n.id,
         type: 'task' as const,
         position: box ? { x: box.x, y: box.y } : { x: 0, y: 0 },
+        // Declared up front so React Flow can cull off-screen cards on the very
+        // first pass. Without these it has to mount every node and measure it
+        // with a ResizeObserver before it knows what is visible — on a large
+        // board that is the whole graph in the DOM before any culling happens.
+        width: box?.width ?? NODE_WIDTH,
+        height: box?.height ?? NODE_HEIGHT,
         data: {
           task: n,
           stale: invalidSet.has(n.id) && n.status !== 'invalidated',
@@ -319,7 +325,15 @@ export function GraphPage() {
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
-            minZoom={0.1}
+            // A tidy tree is about as wide as it has leaves: the 93-node board
+            // measures 18672 x 4152 px, which needs zoom 0.021 to fit. The old
+            // 0.1 floor clamped `fitView` to 5x too close, so a big board opened
+            // somewhere in its middle with no way to see the whole thing.
+            minZoom={0.01}
+            // Mount only the cards intersecting the viewport. Once you zoom in
+            // past the bird's-eye view that is a handful of nodes instead of
+            // every one on the board.
+            onlyRenderVisibleElements
             nodesDraggable
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
