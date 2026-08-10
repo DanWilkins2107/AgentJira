@@ -39,9 +39,10 @@ For soft-blocked work, try to evaluate whether it should have a hard block. Idea
 Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parallel when there are several. Give each subagent:
 
 - the **node id**, and the instruction to follow this `aj-pickup` skill's **Working a node** procedure for that one node;
-- a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished *without* a status change.
+- a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished *without* a status change;
+- the instruction to finish with **one line** — node id, what stage it reached, and anything genuinely blocked. No summary of the work; the board carries that.
 
-Never point two subagents at the same node. When they report back, relay a short summary of what each did. If `aj tasks` showed no agent-turn work, say so and stop — don't invent work or do it yourself.
+Never point two subagents at the same node. If `aj tasks` showed no agent-turn work, don't invent work or do it yourself — go to step 4 and wait for the board to change.
 
 ## Orchestrator — step 4: monitor the board
 
@@ -59,7 +60,18 @@ done
 
 Run it with `persistent: true` and a description like `AgentJira board — new actionable nodes`. First pass seeds the baseline silently; after that each line is a node that became actionable.
 
-When it fires: re-run `aj tasks`, apply step 2's judgment, and dispatch subagents for whatever is now pickable. Keep doing this until the board has no agent-turn work left and no subagent is still running, then `TaskStop` the monitor and report.
+When it fires: re-run `aj tasks`, apply step 2's judgment, and dispatch subagents for whatever is now pickable.
+
+**Never stop the monitor yourself.** An empty board is not a reason to shut down — it just means the human's turn is in progress and agent-turn work will reappear. Leave the monitor armed indefinitely and keep dispatching as nodes become actionable; only the human ends the session, by stopping the monitor or telling you to.
+
+## Orchestrator — reporting
+
+The human is not reading this conversation unless something goes wrong. Report in small checkpoints, not narratives:
+
+- One short line when you dispatch (`dispatched 4: <ids>`), one short line when a node lands (`<id> — PR raised` / `<id> — split proposed`).
+- No full descriptions of what was implemented, no restating specs, no per-node walkthroughs.
+- Don't ask subagents for a summary of their work, and don't relay one. The board is the record — status changes and node threads say what happened.
+- Speak up properly only when something needs the human: a blocker you can't clear, a failure, a judgment call.
 
 ---
 
