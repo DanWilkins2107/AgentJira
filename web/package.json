@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tailscale": "vite --mode tailscale",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

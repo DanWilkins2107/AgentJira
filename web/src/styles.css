@@ -135,11 +135,13 @@ label {
 }
 .form-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: flex-end;
 }
 .form-row label {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
 .card {
@@ -162,6 +164,7 @@ label {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 }
 .topbar {
   display: flex;
@@ -176,9 +179,19 @@ label {
   font-weight: 700;
   font-size: 16px;
   color: var(--text);
+  flex: 0 0 auto;
 }
 .topbar-spacer {
   flex: 1;
+}
+.topbar .muted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar button {
+  flex: 0 0 auto;
 }
 .main {
   flex: 1;
@@ -222,15 +235,23 @@ label {
 }
 .project-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .project-link {
   font-weight: 700;
   font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.project-card-head .muted {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .project-card-head .btn-small {
   margin-left: auto;
+  flex: 0 0 auto;
 }
 .archived-projects {
   margin-bottom: 20px;
@@ -254,17 +275,20 @@ label {
 }
 .secret-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 .secret-value {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 .gha-steps {
   margin: 4px 0;
   padding-left: 20px;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 .create-project {
   display: flex;
@@ -283,8 +307,9 @@ label {
 }
 .graph-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
   padding: 10px 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -292,6 +317,13 @@ label {
 .graph-toolbar h1 {
   margin: 0;
   font-size: 17px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-toolbar > a {
+  flex: 0 0 auto;
 }
 .graph-canvas {
   flex: 1;
@@ -479,7 +511,34 @@ label {
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 12px;
-  max-width: 250px;
+  /* Shrinks to the toggle when collapsed, capped when open. */
+  width: max-content;
+  max-width: min(250px, calc(100vw - 32px));
+}
+.legend-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font-weight: 700;
+  font-size: 12px;
+}
+.legend-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  text-decoration: underline;
+}
+.legend-caret {
+  color: var(--muted);
+}
+.legend-body {
+  margin-top: 8px;
+  /* Never taller than the canvas — scroll the legend, not the page. */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
 }
 .legend-title {
   font-weight: 700;
@@ -567,6 +626,7 @@ label {
   position: relative;
   margin-left: auto;
   width: 320px;
+  max-width: 100%;
 }
 .search-results {
   position: absolute;
@@ -931,4 +991,72 @@ label {
   border-radius: 6px;
   padding: 12px;
   margin: 0;
+}
+
+/* ---- mobile ---- */
+
+@media (max-width: 640px) {
+  .page {
+    padding: 14px 12px;
+  }
+  .topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  /* 16px stops iOS Safari zooming the page on focus */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+  .create-project {
+    max-width: none;
+  }
+
+  /* Full-width stacking: no side-by-side fields, no button squeezed off the edge */
+  .form-row label {
+    flex: 1 1 100%;
+  }
+  .project-card-head .btn-small {
+    margin-left: 0;
+  }
+  .secret-value {
+    flex: 1 1 100%;
+  }
+
+  /* Graph toolbar reflows to three rows: [back · title · new node] /
+     [search] / [filters]. Source order puts the toggles before the search
+     and the button last, so reorder rather than reshuffle the markup. */
+  .graph-toolbar {
+    padding: 8px 12px;
+    gap: 8px 10px;
+  }
+  .graph-toolbar h1 {
+    flex: 1 1 auto;
+    font-size: 15px;
+  }
+  .graph-toolbar .btn-approve {
+    order: 1;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .search-box {
+    order: 2;
+    width: 100%;
+    margin-left: 0;
+  }
+  .graph-toggle {
+    order: 3;
+  }
+  .graph-toggle-hint {
+    display: none;
+  }
+  .legend-body {
+    max-height: 55vh;
+  }
 }

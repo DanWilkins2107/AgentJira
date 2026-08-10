@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { EDGE_STYLE, NOT_PICKABLE_DIM, STATUS_META, cardTreatment } from '../lib/statusMeta'
 import { EDGE_TYPES, NODE_STATUSES } from '../lib/types'
 import type { NodeStatus } from '../lib/types'
@@ -29,10 +30,36 @@ function StatusSwatch({
   )
 }
 
-/** Always-visible legend: status cards, edge styles, badges. */
+const OPEN_KEY = 'aj:legendOpen'
+
+/** Collapsible legend: status cards, edge styles, badges. The open/closed
+ * choice sticks across visits; with no choice yet it starts collapsed on narrow
+ * screens, where the open panel would cover most of the canvas. */
 export function Legend() {
+  const [open, setOpen] = useState(() => {
+    const stored = localStorage.getItem(OPEN_KEY)
+    if (stored !== null) return stored === '1'
+    return !window.matchMedia('(max-width: 640px)').matches
+  })
+  function toggle() {
+    setOpen((o) => {
+      localStorage.setItem(OPEN_KEY, o ? '0' : '1')
+      return !o
+    })
+  }
   return (
     <div className="legend">
+      <button type="button" className="legend-toggle" onClick={toggle} aria-expanded={open}>
+        Legend <span className="legend-caret">{open ? '▾' : '▸'}</span>
+      </button>
+      {open ? <LegendBody /> : null}
+    </div>
+  )
+}
+
+function LegendBody() {
+  return (
+    <div className="legend-body">
       <div className="legend-title">Statuses</div>
       <div className="legend-note">Light/bright card = your turn · dark card = agent's</div>
       {NODE_STATUSES.map((s) => (
