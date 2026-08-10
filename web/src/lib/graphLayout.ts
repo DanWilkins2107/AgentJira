@@ -1,4 +1,4 @@
-import type { NodeEdge, TaskNode } from './types'
+import type { GraphNode, NodeEdge } from './types'
 
 // Base card size (fallback / reference). Real cards taper by spine depth — see
 // sizeForDepth — so a parent is visibly bigger than its children.
@@ -63,7 +63,7 @@ export interface NodeBox {
  * primary parent are roots; a pure subtask cycle (no root reachable) has its
  * first-seen member promoted to a root so nothing is dropped.
  */
-export function treeLayout(nodes: TaskNode[], edges: NodeEdge[]): Map<string, NodeBox> {
+export function treeLayout(nodes: GraphNode[], edges: NodeEdge[]): Map<string, NodeBox> {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const nodeIds = new Set(byId.keys())
 

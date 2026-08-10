@@ -1,7 +1,7 @@
 import { MarkerType, ReactFlow, Panel } from '@xyflow/react'
 import type { Edge as FlowEdge, NodeMouseHandler } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Legend } from '../components/Legend'
 import { NewNodeDialog } from '../components/NewNodeDialog'
@@ -20,9 +20,16 @@ import {
 } from '../lib/pickup'
 import { EDGE_STYLE } from '../lib/statusMeta'
 import { supabase } from '../lib/supabase'
-import type { NodeEdge, Project, TaskNode } from '../lib/types'
+import { GRAPH_NODE_COLUMNS } from '../lib/types'
+import type { GraphNode, NodeEdge, Project } from '../lib/types'
 
 const nodeTypes = { task: TaskNodeView }
+
+/** Floor between refetches. `focus` fires every time the browser is
+ * foregrounded — constantly on a phone — and each refetch relayouts the whole
+ * board, so an unthrottled listener is pure churn on the device least able to
+ * absorb it. Doubles as an in-flight guard: the stamp is taken on entry. */
+const REFETCH_MIN_MS = 10_000
 
 /** Per-edge-type rendering: subtask = ubiquitous scaffolding (thinner, faded);
  * blocks = emphasized on top; relates_to = faint context. */
@@ -49,7 +56,7 @@ export function GraphPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
-  const [taskNodes, setTaskNodes] = useState<TaskNode[]>([])
+  const [taskNodes, setTaskNodes] = useState<GraphNode[]>([])
   const [taskEdges, setTaskEdges] = useState<NodeEdge[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -87,11 +94,16 @@ export function GraphPage() {
     [doneKey],
   )
 
+  const lastLoadAt = useRef(0)
   const load = useCallback(async () => {
     if (!projectId) return
+    lastLoadAt.current = Date.now()
     const [projRes, nodesRes, edgesRes] = await Promise.all([
       supabase.from('projects').select('*').eq('id', projectId).single(),
-      supabase.from('nodes').select('*').eq('project_id', projectId),
+      // Only the columns the board reads — never `*`, which drags every node's
+      // tldraw_doc, body and spec across the wire for a view that shows none
+      // of them (see GRAPH_NODE_COLUMNS).
+      supabase.from('nodes').select(GRAPH_NODE_COLUMNS).eq('project_id', projectId),
       supabase.from('edges').select('*').eq('project_id', projectId).is('removed_at', null),
     ])
     const err = projRes.error ?? nodesRes.error ?? edgesRes.error
@@ -101,15 +113,19 @@ export function GraphPage() {
     }
     setError(null)
     setProject(projRes.data as Project)
-    setTaskNodes((nodesRes.data ?? []) as TaskNode[])
+    setTaskNodes((nodesRes.data ?? []) as GraphNode[])
     setTaskEdges((edgesRes.data ?? []) as NodeEdge[])
     setLoaded(true)
   }, [projectId])
 
   useEffect(() => {
     void load()
-    window.addEventListener('focus', load)
-    return () => window.removeEventListener('focus', load)
+    const onFocus = () => {
+      if (document.hidden || Date.now() - lastLoadAt.current < REFETCH_MIN_MS) return
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [load])
 
   const { flowNodes, flowEdges } = useMemo(() => {

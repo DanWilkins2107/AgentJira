@@ -1,5 +1,5 @@
 import { STATUS_META } from './statusMeta'
-import type { NodeEdge, TaskNode } from './types'
+import type { GraphNode, NodeEdge } from './types'
 
 /**
  * Has this node's plan LANDED? The satisfaction point for plan-variant block
@@ -7,7 +7,7 @@ import type { NodeEdge, TaskNode } from './types'
  * its deliverable merged (typically a breakdown_on_merge node whose plan PR
  * merged and which re-entered breakdown to split the planned work).
  */
-export function planLanded(node: TaskNode): boolean {
+export function planLanded(node: GraphNode): boolean {
   return node.status === 'done' || node.merge_sha !== null
 }
 
@@ -26,7 +26,7 @@ const NON_LIVE_STATUSES = new Set<string>(['done', 'invalidated', 'broken_down']
  *
  * Pass the FULL node/edge sets so the whole subtree is present.
  */
-export function subtreeCompleteIds(nodes: TaskNode[], edges: NodeEdge[]): Set<string> {
+export function subtreeCompleteIds(nodes: GraphNode[], edges: NodeEdge[]): Set<string> {
   const childrenBySource = new Map<string, string[]>()
   for (const e of edges) {
     if (e.removed_at !== null || e.type !== 'subtask') continue
@@ -68,7 +68,7 @@ export function subtreeCompleteIds(nodes: TaskNode[], edges: NodeEdge[]): Set<st
  */
 export function directChildrenSettled(
   nodeId: string,
-  nodes: TaskNode[],
+  nodes: GraphNode[],
   edges: NodeEdge[],
   completeIds: Set<string>,
 ): { settled: number; total: number } {
@@ -103,7 +103,7 @@ export function directChildrenSettled(
  *
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
-export function firmlyGatedTargets(nodes: TaskNode[], edges: NodeEdge[]): Set<string> {
+export function firmlyGatedTargets(nodes: GraphNode[], edges: NodeEdge[]): Set<string> {
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const completeIds = subtreeCompleteIds(nodes, edges)
   const gated = new Set<string>()
@@ -140,7 +140,7 @@ export function firmlyGatedTargets(nodes: TaskNode[], edges: NodeEdge[]): Set<st
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
 export function readyToPickupIds(
-  nodes: TaskNode[],
+  nodes: GraphNode[],
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): Set<string> {
@@ -171,7 +171,7 @@ export function readyToPickupIds(
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
 export function blockedFromPickupIds(
-  nodes: TaskNode[],
+  nodes: GraphNode[],
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): Set<string> {
@@ -200,7 +200,7 @@ export function blockedFromPickupIds(
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
 export function softBlockedIds(
-  nodes: TaskNode[],
+  nodes: GraphNode[],
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): Set<string> {

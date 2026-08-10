@@ -1,7 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import type { Node, NodeProps } from '@xyflow/react'
 import { NOT_PICKABLE_DIM, STATUS_META, cardTreatment } from '../lib/statusMeta'
-import type { TaskNode } from '../lib/types'
+import type { GraphNode } from '../lib/types'
 import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graphLayout'
 
 /** Depth-tapered card size, supplied by the tidy-tree layout (graphLayout.ts). */
@@ -12,7 +12,7 @@ interface NodeSize {
 
 export type TaskFlowNode = Node<
   {
-    task: TaskNode
+    task: GraphNode
     stale: boolean
     ready: boolean
     blocked: boolean
@@ -31,7 +31,6 @@ export type TaskFlowNode = Node<
 
 /** Green used for a container whose subtree is fully settled (gates cleared). */
 const CONTAINER_DONE_GREEN = '#12b886'
-const CONTAINER_DONE_GLOW = '0 0 10px 1px rgba(18, 184, 134, 0.25)'
 
 /**
  * Custom graph node. Turn is readable by brightness: human-turn statuses get
@@ -66,14 +65,6 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
   const treat = cardTreatment(task.status, stale)
   const container = data.container
   const containerComplete = container?.complete ?? false
-  // A fully-settled container gets a green glow to signal its gates are clear;
-  // otherwise fall back to the treatment glow (light human-turn cards only) —
-  // except when firm-gated, where the glow would fight the fade below.
-  const boxShadow = containerComplete
-    ? CONTAINER_DONE_GLOW
-    : data.blocked
-      ? undefined
-      : treat.glow
   // Solid = actionable now: pickable, in progress (claimed), or awaiting a
   // person (human- or github-turn, e.g. PR raised). Everything else is parked —
   // firm-blocked or settled (done/broken_down/invalidated) — so it recedes.
@@ -99,7 +90,6 @@ export function TaskNodeView({ data }: NodeProps<TaskFlowNode>) {
             ? `6px solid ${treat.accentBar}`
             : `2px solid ${treat.borderColor}`,
         color: treat.text,
-        boxShadow,
         // Actionable cards keep their natural opacity; parked cards recede so the
         // actionable set reads at a glance. Invalidated/stale keep their own
         // deeper dim either way (via treat.dim / Math.min).

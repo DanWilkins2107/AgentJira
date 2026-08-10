@@ -1,4 +1,4 @@
-import type { NodeEdge, TaskNode } from './types'
+import type { GraphNode, NodeEdge } from './types'
 
 const DEPTH_CAP = 50
 
@@ -15,7 +15,7 @@ const DEPTH_CAP = 50
  * automatically un-stales the whole subtree with zero writes. Blocks never
  * affect staleness.
  */
-export function effectivelyInvalidated(nodes: TaskNode[], edges: NodeEdge[]): Set<string> {
+export function effectivelyInvalidated(nodes: GraphNode[], edges: NodeEdge[]): Set<string> {
   const children = new Map<string, string[]>()
   for (const e of edges) {
     if (e.type !== 'subtask' || e.removed_at !== null) continue

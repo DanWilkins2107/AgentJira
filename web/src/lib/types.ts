@@ -119,6 +119,21 @@ export interface TaskNode {
   updated_at: string
 }
 
+/**
+ * The columns the graph view actually reads. The board fetches this subset
+ * rather than `*` so a project's canvases (`tldraw_doc`) and long `body`/`spec`
+ * text never ride along — on a phone that payload is dead weight, and it grows
+ * without bound as canvases get used. `TaskNode` satisfies this structurally,
+ * so anything holding a full node can still be passed to the graph helpers.
+ */
+export type GraphNode = Pick<
+  TaskNode,
+  'id' | 'title' | 'status' | 'is_vision' | 'claimed_by' | 'merge_sha' | 'created_at'
+>
+
+/** Column list for the `GraphNode` select — keep in step with the type above. */
+export const GRAPH_NODE_COLUMNS = 'id,title,status,is_vision,claimed_by,merge_sha,created_at'
+
 export interface NodeEdge {
   id: string
   project_id: string

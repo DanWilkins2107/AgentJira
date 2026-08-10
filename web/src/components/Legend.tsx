@@ -23,7 +23,6 @@ function StatusSwatch({
         borderLeft: treat.accentBar
           ? `4px solid ${treat.accentBar}`
           : `1.5px solid ${treat.borderColor}`,
-        boxShadow: treat.glow,
         opacity: notPickable ? Math.min(treat.dim ?? 1, NOT_PICKABLE_DIM) : treat.dim,
       }}
     />

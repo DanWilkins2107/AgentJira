@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StageFlow } from '../components/StageFlow'
 import { StatusPill } from '../components/StatusPill'
@@ -14,11 +14,20 @@ import type {
   TaskNode,
 } from '../lib/types'
 import { ActionBar } from './node/ActionBar'
-import { CanvasTab } from './node/CanvasTab'
 import { EdgesTab } from './node/EdgesTab'
 import { HistoryTab } from './node/HistoryTab'
 import { SpecTab } from './node/SpecTab'
 import { ThreadsTab } from './node/ThreadsTab'
+
+/**
+ * tldraw is ~4 MB of JS — by far the heaviest thing the app can load, and it is
+ * only ever rendered on this one tab. Imported statically it rode the same chunk
+ * as everything else, so the graph route paid for it too and phones were killing
+ * the tab on load. Split it out: nothing fetches tldraw until Canvas is opened.
+ */
+const CanvasTab = lazy(() =>
+  import('./node/CanvasTab').then((m) => ({ default: m.CanvasTab })),
+)
 
 type Tab = 'canvas' | 'threads' | 'history' | 'edges' | 'spec'
 
@@ -220,7 +229,11 @@ export function NodePage() {
       </div>
 
       {tab === 'threads' ? <ThreadsTab node={node} messages={messages} reload={load} /> : null}
-      {tab === 'canvas' ? <CanvasTab key={node.id} node={node} reload={load} /> : null}
+      {tab === 'canvas' ? (
+        <Suspense fallback={<div className="page-loading">Loading canvas…</div>}>
+          <CanvasTab key={node.id} node={node} reload={load} />
+        </Suspense>
+      ) : null}
       {tab === 'edges' ? (
         <EdgesTab node={node} edges={edges} projectNodes={projectNodes} reload={load} />
       ) : null}

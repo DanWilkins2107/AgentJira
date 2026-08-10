@@ -83,8 +83,6 @@ export interface CardTreatment {
   text: string
   /** Left accent bar color (dark cards only). */
   accentBar?: string
-  /** Outer glow (light human-turn cards only). */
-  glow?: string
   /** Whole-card opacity for heavily dimmed states (invalidated). */
   dim?: number
   pillBackground: string
@@ -110,14 +108,15 @@ export function cardTreatment(status: NodeStatus, stale = false): CardTreatment 
   }
   const turn = STATUS_META[status].turn
   if (turn === 'human' || turn === 'github') {
-    // Light/bright: near-solid status background, dark text, subtle glow.
+    // Light/bright: near-solid status background, dark text. The fill alone
+    // carries the signal — no outer glow, which on a phone costs a blurred
+    // composited layer per card for no extra meaning.
     // github (pr_raised) is included — it awaits the human's review on GitHub,
     // so by "brighter = human needed" it reads as human-attention, not muted.
     return {
       background: statusRgba(status, 0.88),
       borderColor: statusRgba(status),
       text: DARK_TEXT,
-      glow: `0 0 12px 2px ${statusRgba(status, 0.45)}`,
       pillBackground: 'rgba(26, 27, 30, 0.82)',
       pillText: statusRgba(status),
     }
