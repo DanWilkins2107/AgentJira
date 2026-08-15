@@ -1,6 +1,6 @@
 {
   "name": "agentjira-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "aj — the agent-facing CLI for AgentJira (wraps supabase-js with the dedicated agent user's login)",
   "type": "module",
   "bin": {
