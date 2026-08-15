@@ -77,8 +77,12 @@ function isSyncPayload(value: unknown): value is SyncPayload {
   );
 }
 
+function prLabel(payload: SyncPayload): string {
+  return payload.pr_number !== undefined ? `PR #${payload.pr_number}` : "PR";
+}
+
 function messageBody(payload: SyncPayload, breakdownOnMerge: boolean): string {
-  const pr = payload.pr_number !== undefined ? `PR #${payload.pr_number}` : "PR";
+  const pr = prLabel(payload);
   const by = payload.actor ? ` by ${payload.actor}` : "";
   switch (payload.action) {
     case "pr_opened":
@@ -118,6 +122,52 @@ function reviewMessageBody(
   }
   if (payload.review_url) parts.push("", payload.review_url);
   return parts.join("\n");
+}
+
+/**
+ * A merge to main strands every other open PR in the project on a stale base,
+ * so hand them back to an agent to reconcile (see migration 0013).
+ *
+ * This wants to live in a GHA job on `push: [main]`: that job sees the actual
+ * commits, so it could update each branch and bounce only the PRs whose files
+ * the merge touched. Riding the pr_merged report instead needs no per-repo
+ * workflow change, at the cost of bouncing every open PR whether the merge
+ * touched it or not. Move it when that noise costs more than the staleness did.
+ *
+ * Idempotent: the duplicate pr_merged from the closed-PR backup job finds the
+ * siblings already out of pr_raised and does nothing. The merged node excludes
+ * itself the same way — its own status was written before this runs.
+ */
+async function bounceStaleBases(
+  supabase: SupabaseClient,
+  projectId: string,
+  payload: SyncPayload,
+): Promise<boolean> {
+  const { data: stranded, error } = await supabase
+    .from("nodes")
+    .update({ status: "pr_base_moved" })
+    .eq("project_id", projectId)
+    .eq("status", "pr_raised")
+    .select("id");
+  if (error || !stranded) return false;
+  if (stranded.length === 0) return true;
+
+  const body =
+    `${prLabel(payload)} merged onto main, so this node's PR is now behind it.` +
+    ` Merge main in, check what landed against this branch — the merge can be` +
+    ` clean and the change still wrong, or already done — then \`aj resubmit\`.`;
+  const { error: messageError } = await supabase.from("messages").insert(
+    stranded.map((stale) => ({
+      node_id: stale.id,
+      project_id: projectId,
+      stage: "pr_base_moved",
+      author_role: "system",
+      author_id: null,
+      type: "system",
+      body,
+    })),
+  );
+  return !messageError;
 }
 
 async function handle(
@@ -238,6 +288,12 @@ async function handle(
     body: messageBody(payload, node.breakdown_on_merge === true),
   });
   if (messageError) return json({ ok: false }, 500);
+
+  if (payload.action === "pr_merged") {
+    if (!await bounceStaleBases(supabase, node.project_id, payload)) {
+      return json({ ok: false }, 500);
+    }
+  }
 
   return json({ ok: true }, 200);
 }

@@ -21,6 +21,7 @@ stateDiagram-v2
     evaluating_soft_block : evaluating_soft_block (agent/judge)
     pr_raised : pr_raised (github)
     pr_changes_requested : pr_changes_requested (agent)
+    pr_base_moved : pr_base_moved (agent)
     done : done (none)
     invalidated : invalidated (none)
 
@@ -55,6 +56,8 @@ stateDiagram-v2
     ready_for_pickup --> pr_raised : agent raises PR (GHA pr_opened, aj link-pr)
     pr_raised --> pr_changes_requested : reviewer requests changes / leaves inline comments
     pr_changes_requested --> pr_raised : agent addresses comments, aj resubmit
+    pr_raised --> pr_base_moved : any other PR in the project merges — this base is now stale
+    pr_base_moved --> pr_raised : agent reconciles with main, aj resubmit
     pr_raised --> done : GitHub approval, GHA merges, pr_merged
     pr_raised --> awaiting_agent_breakdown : breakdown_on_merge node — merged plan routes back to split
 
@@ -82,9 +85,10 @@ stateDiagram-v2
     end note
 ```
 
-Two loops in that diagram are easy to miss:
+Three loops in that diagram are easy to miss:
 
 - **The soft-block judge** (`evaluating_soft_block`). A soft-blocked node is queued for an external, throwaway **judge** session that decides: proceed, escalate a question to the human (which returns here for re-judging once answered), or defer via a `reassess_after` edge — which gates the node exactly like a firm block until its source is `done`, then routes it back through the judge. The board never calls an LLM; a deterministic supervisor just watches for the status and dispatches the session. Detail: `agentjira-workflow` rulebook + [architecture.md](architecture.md).
+- **Stale-base reconcile** (`pr_raised → pr_base_moved`). Nodes wait in `pr_raised` for a human review, and while they wait, siblings merge. So any merge hands every other open PR in the project back to an agent to merge main in and re-check the branch against what landed — a clean merge is not evidence the change is still correct, or still needed. Nothing bounces a node that is already an agent's (e.g. `pr_changes_requested`); that agent picks main's changes up anyway.
 - **Breakdown-on-merge re-entry** (`pr_raised → awaiting_agent_breakdown`). A node flagged `breakdown_on_merge` delivers a plan/spec document, so its PR merge routes it back to breakdown (recording the `merge_sha`) instead of `done` — the planned work still has to be split into tasks.
 
 Orthogonal to status: **stale** (derived at read time, never stored — an ancestor via subtask edges is currently `invalidated`; the node is dead until that ancestor is restored) and `claimed_by` (an agent session is actively on it; humans clear stuck claims from the UI).
@@ -164,6 +168,12 @@ sequenceDiagram
         Agent->>GitHub: push fixes on the branch (as the app identity)
         Agent->>Board: aj resubmit → pr_raised, re-request review on GitHub
         Note over Board: pr_raised
+    end
+    opt a sibling node's PR merges first
+        GHA->>Board: POST pr_merged for the sibling
+        Note over Board: pr_base_moved — every other pr_raised node in the project
+        Agent->>Agent: merge main in, check what landed against this branch
+        Agent->>Board: aj resubmit → pr_raised
     end
     Human->>GitHub: review and approve the PR
     GHA->>Board: POST pr_approved

@@ -28,6 +28,7 @@ This document is the single source of truth for names, enums, schemas, and API s
 | `evaluating_soft_block` | agent | A soft-blocked node queued for the soft-block **judge** to decide: proceed, escalate to the human (→ `awaiting_human_response`), or defer for reassessment (a `reassess_after` edge). The board never calls an LLM — an external supervisor watches for this agent-turn status and dispatches a fresh, throwaway headless judge session; the supervisor stays deterministic and never reads the verdict. Off-rail side-loop, like `pr_changes_requested` |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; GHA merges and reports back |
 | `pr_changes_requested` | agent | Reviewer requested changes / left inline comments; agent addresses them, then `aj resubmit` → `pr_raised`. Mirror of `awaiting_human_response` (human asked the agent, not the other way) |
+| `pr_base_moved` | agent | Another PR in the project merged, so this node's open PR is behind main. The agent merges main in and checks what landed against the branch — a clean merge can still leave the change wrong or already done — then `aj resubmit` → `pr_raised`. Off-rail side loop, like `pr_changes_requested` |
 | `done` | none | Merged (or completed); `merge_sha` recorded |
 | `invalidated` | none | Marked wrong; `invalidation_reason` recorded; kept forever as context |
 
@@ -206,7 +207,7 @@ Local-dev convenience: create `dan@agentjira.local` (owner) and `agent@agentjira
 }
 ```
 
-Effects: `pr_opened` → set `pr_url`/`pr_number`, status `pr_raised`. `pr_changes_requested` → status `pr_changes_requested`, and the review lands on the thread as a **`review_comment`** message (verbatim summary + inline comments + link) so agents work it from the board without leaving for GitHub — this hands the turn back to the agent. `pr_merged` → set `merge_sha`; status `done`, **unless the node has `breakdown_on_merge`** — then status `awaiting_agent_breakdown` (plan-deliverable: the merged document gets split into tasks), applied only while the node is still `pr_raised`/`pr_changes_requested` so a duplicate merge report never clobbers post-merge progress (re-setting `done` stays idempotent as before). `pr_approved`/`pr_closed` → event + system message only (no status change; a closed-unmerged PR is for humans/agents to triage). Every call logs an `events` row and posts a message to the node at its (new) stage (`system` type, except `pr_changes_requested` which posts `review_comment`). Unknown node or bad secret → 401/404, no detail leaked.
+Effects: `pr_opened` → set `pr_url`/`pr_number`, status `pr_raised`. `pr_changes_requested` → status `pr_changes_requested`, and the review lands on the thread as a **`review_comment`** message (verbatim summary + inline comments + link) so agents work it from the board without leaving for GitHub — this hands the turn back to the agent. `pr_merged` → set `merge_sha`; status `done`, **unless the node has `breakdown_on_merge`** — then status `awaiting_agent_breakdown` (plan-deliverable: the merged document gets split into tasks), applied only while the node is still `pr_raised`/`pr_changes_requested` so a duplicate merge report never clobbers post-merge progress (re-setting `done` stays idempotent as before). `pr_merged` additionally **sweeps the project**: every other node still in `pr_raised` moves to `pr_base_moved` with a `system` message, because main just moved under their open PRs. `pr_approved`/`pr_closed` → event + system message only (no status change; a closed-unmerged PR is for humans/agents to triage). Every call logs an `events` row and posts a message to the node at its (new) stage (`system` type, except `pr_changes_requested` which posts `review_comment`). Unknown node or bad secret → 401/404, no detail leaked.
 
 ## Agent PR identity (`github-token` Edge Function)
 
@@ -259,7 +260,7 @@ Node 22 + TypeScript + commander + `@supabase/supabase-js`. Config resolution: e
 | `aj set-status <node> <status>` | Direct status set (validated against enum) |
 | `aj set-breakdown-on-merge <node> [--off]` | Set/clear `breakdown_on_merge` — flag a plan-deliverable node so `pr_merged` routes it back to `awaiting_agent_breakdown` instead of `done`. Set it before the PR merges |
 | `aj link-pr <node> --url <u> --number <n>` | Set PR fields + status → `pr_raised` (backup for when the GHA isn't installed) |
-| `aj resubmit <node> [--body <text>]` | After addressing PR review comments, hand back to review: `pr_changes_requested` → `pr_raised`, posting a `note`. Refuses unless the node is `pr_changes_requested` (`--force` overrides). The explicit round-trip so a WIP push never flips the turn |
+| `aj resubmit <node> [--body <text>]` | After addressing PR review comments or reconciling with main, hand back to review: `pr_changes_requested` / `pr_base_moved` → `pr_raised`, posting a `note`. Refuses on any other status (`--force` overrides). The explicit round-trip so a WIP push never flips the turn |
 | `aj github-token <node>` | Mint a short-lived (~1h), repo-scoped GitHub App installation token (contents+PR write) via the `github-token` function, so branches/PRs are authored by `agentjira[bot]` and the human can approve. Token → stdout, expiry → stderr |
 | `aj invalidate <node> --reason <text>` | Calls `invalidate_node` RPC (descendants become stale — derived — until this node is restored; blocks unaffected) |
 | `aj search -p <project> <query>` | `search_all` RPC results |
@@ -292,6 +293,7 @@ Routes: `/login` · `/` (projects list + create; owner can add agent member by u
 | `evaluating_soft_block` | muted gold `#d9a441` (agent turn — the soft-block judge is deciding) |
 | `pr_raised` | purple `#9775fa` (bright — awaiting the human's PR review) |
 | `pr_changes_requested` | deep violet `#7048e8` (agent turn) |
+| `pr_base_moved` | grape `#ae3ec9` (agent turn — a separate hue, not another violet, so the two PR side loops stay apart on a dark card's thin border) |
 | `broken_down` | gray-blue `#748ffc` at 50% |
 | `done` | muted green `#40c057` at 70% |
 | `invalidated` | gray `#868e96` |

@@ -74,12 +74,22 @@ export function questionReturnTarget(events: EventRow[]): NodeStatus {
 }
 
 type StepState = 'visited' | 'current' | 'skipped' | 'future'
-type OffRailChip =
-  | 'awaiting_human_response'
-  | 'pr_changes_requested'
-  | 'evaluating_soft_block'
-  | 'invalidated'
-  | null
+
+/** Statuses that interrupt the rail rather than sit on it. Each renders as a
+ * chip anchored to the last on-rail status the node reached. */
+const OFF_RAIL_CAPTION = {
+  awaiting_human_response: '⤴ side loop: agent asked a question',
+  pr_changes_requested: '⤴ side loop: reviewer requested changes',
+  pr_base_moved: '⤴ side loop: main moved under the PR',
+  evaluating_soft_block: '⤴ side loop: soft-block judge deciding',
+  invalidated: '✕ invalidated — off the rail',
+} satisfies Partial<Record<NodeStatus, string>>
+
+type OffRailChip = keyof typeof OFF_RAIL_CAPTION | null
+
+function offRailChip(status: NodeStatus): OffRailChip {
+  return status in OFF_RAIL_CAPTION ? (status as keyof typeof OFF_RAIL_CAPTION) : null
+}
 
 /** Rail index the off-rail chip anchors to: last on-rail status in the visited sequence. */
 function anchorIndex(rail: NodeStatus[], visited: NodeStatus[]): number {
@@ -133,11 +143,8 @@ export function StageFlow({
     return COMMON_STEPS // undecided: all branches rendered separately as dimmed futures
   }, [atOpenFork, humanOnlyTouched, splitTouched, specTouched, visitedSet])
 
-  const offRail =
-    node.status === 'awaiting_human_response' ||
-    node.status === 'pr_changes_requested' ||
-    node.status === 'evaluating_soft_block' ||
-    node.status === 'invalidated'
+  const chip = offRailChip(node.status)
+  const offRail = chip !== null
   const currentIdx = offRail ? anchorIndex(rail, visited) : rail.indexOf(node.status)
 
   // Furthest progress along the rendered rail (visited or current) — anything
@@ -154,14 +161,6 @@ export function StageFlow({
     if (i < furthestIdx) return 'skipped'
     return 'future'
   }
-
-  const chip: OffRailChip =
-    node.status === 'awaiting_human_response' ||
-    node.status === 'pr_changes_requested' ||
-    node.status === 'evaluating_soft_block' ||
-    node.status === 'invalidated'
-      ? node.status
-      : null
 
   async function go(target: NodeStatus) {
     setBusy(true)
@@ -239,14 +238,14 @@ export function StageFlow({
         return (
           <span className="sf-hint" style={{ color }}>
             Reviewer requested changes — agent addresses them, then re-requests review
-            {node.pr_url ? (
-              <>
-                {' · '}
-                <a href={node.pr_url} target="_blank" rel="noreferrer">
-                  PR{node.pr_number != null ? ` #${node.pr_number}` : ''} ↗
-                </a>
-              </>
-            ) : null}
+            <PrLink node={node} />
+          </span>
+        )
+      case 'pr_base_moved':
+        return (
+          <span className="sf-hint" style={{ color }}>
+            Main moved under this PR — agent reconciles it, then re-requests review
+            <PrLink node={node} />
           </span>
         )
       case 'pr_raised':
@@ -255,16 +254,7 @@ export function StageFlow({
         return (
           <span className="sf-cue" style={{ background: statusRgba(node.status, 0.25), borderColor: color }}>
             Your review needed — approve the PR on GitHub
-            {node.pr_url ? (
-              <>
-                {' · '}
-                <a href={node.pr_url} target="_blank" rel="noreferrer">
-                  PR{node.pr_number != null ? ` #${node.pr_number}` : ''} ↗
-                </a>
-              </>
-            ) : (
-              ' ↗'
-            )}
+            {node.pr_url ? <PrLink node={node} /> : ' ↗'}
           </span>
         )
       case 'broken_down':
@@ -319,6 +309,18 @@ export function StageFlow({
   )
 }
 
+function PrLink({ node }: { node: TaskNode }) {
+  if (!node.pr_url) return null
+  return (
+    <>
+      {' · '}
+      <a href={node.pr_url} target="_blank" rel="noreferrer">
+        PR{node.pr_number != null ? ` #${node.pr_number}` : ''} ↗
+      </a>
+    </>
+  )
+}
+
 function ForkBranch({ caption, steps }: { caption: string; steps: NodeStatus[] }) {
   return (
     <div className="sf-fork-branch">
@@ -350,42 +352,12 @@ function Step({ status, state, chip }: { status: NodeStatus; state: StepState; c
       </div>
       <div className="sf-label">{STATUS_META[status].label}</div>
       {state === 'skipped' ? <div className="sf-caption">skipped</div> : null}
-      {chip === 'awaiting_human_response' ? (
+      {chip ? (
         <div
           className="sf-offrail"
-          style={{
-            borderColor: statusRgba('awaiting_human_response'),
-            color: statusRgba('awaiting_human_response'),
-          }}
+          style={{ borderColor: statusRgba(chip), color: statusRgba(chip) }}
         >
-          ⤴ side loop: agent asked a question
-        </div>
-      ) : chip === 'pr_changes_requested' ? (
-        <div
-          className="sf-offrail"
-          style={{
-            borderColor: statusRgba('pr_changes_requested'),
-            color: statusRgba('pr_changes_requested'),
-          }}
-        >
-          ⤴ side loop: reviewer requested changes
-        </div>
-      ) : chip === 'evaluating_soft_block' ? (
-        <div
-          className="sf-offrail"
-          style={{
-            borderColor: statusRgba('evaluating_soft_block'),
-            color: statusRgba('evaluating_soft_block'),
-          }}
-        >
-          ⤴ side loop: soft-block judge deciding
-        </div>
-      ) : chip === 'invalidated' ? (
-        <div
-          className="sf-offrail"
-          style={{ borderColor: statusRgba('invalidated'), color: statusRgba('invalidated') }}
-        >
-          ✕ invalidated — off the rail
+          {OFF_RAIL_CAPTION[chip]}
         </div>
       ) : null}
     </div>

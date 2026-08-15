@@ -81,7 +81,7 @@ aj projects
 
 ### `aj tasks [-p <project>] [--session <label>]`
 
-Nodes in the agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block`/`reassess_after` edge targeting it (blocker title + status). A `reassess_after` edge from an unfinished source lands the task in "not recommended", exactly like a firm block — it's deferred for re-judgment until the source resolves.
+Nodes in the agent-turn statuses: `awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`, `pr_base_moved`. Each task is annotated with its claim and every non-removed `firm_block`/`soft_block`/`reassess_after` edge targeting it (blocker title + status). A `reassess_after` edge from an unfinished source lands the task in "not recommended", exactly like a firm block — it's deferred for re-judgment until the source resolves.
 
 `human_only_action` is a human turn, so those nodes never appear here at all — they are work no agent can do. A firm block *from* one reads as unfinished until the human marks it `done`, which is exactly right: nothing downstream can move.
 

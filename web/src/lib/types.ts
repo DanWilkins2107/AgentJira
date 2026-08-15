@@ -15,6 +15,7 @@ export type NodeStatus =
   | 'evaluating_soft_block'
   | 'pr_raised'
   | 'pr_changes_requested'
+  | 'pr_base_moved'
   | 'done'
   | 'invalidated'
 
@@ -32,6 +33,7 @@ export const NODE_STATUSES: NodeStatus[] = [
   'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
+  'pr_base_moved',
   'done',
   'invalidated',
 ]

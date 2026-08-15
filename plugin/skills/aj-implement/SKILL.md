@@ -21,11 +21,15 @@ aj context <node>
 
 Read the spec **if there is one** (a spec-less node carries its contract in the title, body, and thread instead), the threads (spec-review comments often carry constraints), and **the downloaded canvas PNGs**. Check invalidated/stale ancestors — if the context shows the node is **stale** (an ancestor is currently invalidated; derived, so it never appears in `aj tasks`), it is dead until that ancestor is restored: do not implement it unless a human explicitly directs you to — ask (`aj post <node> --type question --body "..."`) instead of building on a dead premise.
 
-Then invoke the stage-notes skill for this node's current status — `aj-stage-notes-ready-for-pickup`, or `aj-stage-notes-pr-changes-requested` on a review round — to load this project's instructions for the stage, including how long the PR body should be.
+Then invoke the stage-notes skill for this node's current status — `aj-stage-notes-ready-for-pickup`, or `aj-stage-notes-pr-changes-requested` / `aj-stage-notes-pr-base-moved` on a round-trip — to load this project's instructions for the stage, including how long the PR body should be.
 
 ## 3. Branch
 
-Work on a fresh git branch in the project's repo (one repo per project), branched from the default branch.
+Work on a fresh git branch in the project's repo (one repo per project), branched from the **remote** default branch — a local `main` may be days behind, and starting there means your PR is born stale:
+
+```
+git fetch origin && git switch -c <branch> origin/main
+```
 
 ## 4. Implement per the contract
 
@@ -125,3 +129,35 @@ When a reviewer requests changes or leaves inline comments, the GHA flips the no
    This is the **explicit round-trip** (`pr_changes_requested` → `pr_raised`) — deliberate, so a work-in-progress push never flips the turn on its own. Then re-request the review on GitHub (e.g. `gh pr ready` / re-request reviewers) so the human can approve.
 
 The loop can repeat as many times as the review needs — same as any other agent turn.
+
+## 9. If main moves under the PR
+
+Any merge in the project flips every other open PR's node to **`pr_base_moved`** (an agent turn). The branch is now behind main, and the point of this stage is that a *clean* merge proves nothing: main may have renamed something the branch calls, changed a contract it relies on, or already done the work.
+
+1. `aj claim <node>`, then `aj context <node>` — the `system` message says which PR merged.
+2. Check out the PR branch, then read what landed before merging anything:
+
+   ```
+   git fetch origin && git log --oneline --stat HEAD..origin/main
+   ```
+
+   Look for renamed or moved symbols the branch calls, changed signatures, migrations that now collide, and contract changes in `docs/architecture.md`.
+3. Merge it in and prove the result, since git being happy is not the same as the change still being right:
+
+   ```
+   git merge origin/main
+   ```
+
+   Then build and test.
+4. Three outcomes:
+   - **Nothing to do** — resolve any conflicts, push, resubmit.
+   - **Branch needs work** — fix it here (invoke `code-style-guide`), push, resubmit.
+   - **Node is now redundant** — main already did it. Don't resubmit; `aj post <node> --type question --body "..."` and let the human decide whether to invalidate.
+5. Push and hand back:
+
+   ```
+   aj gitpush <node>
+   aj resubmit <node> --body "What changed, or that main didn't affect this branch"
+   ```
+
+Same explicit round-trip as a review round: pushing alone never returns the turn.

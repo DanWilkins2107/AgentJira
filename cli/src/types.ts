@@ -14,6 +14,7 @@ export const NODE_STATUSES = [
   'evaluating_soft_block',
   'pr_raised',
   'pr_changes_requested',
+  'pr_base_moved',
   'done',
   'invalidated',
 ] as const;
@@ -29,6 +30,7 @@ export const AGENT_TURN_STATUSES: readonly NodeStatus[] = [
   'ready_for_pickup',
   'evaluating_soft_block',
   'pr_changes_requested',
+  'pr_base_moved',
 ];
 
 export const EDGE_TYPES = [

@@ -24,11 +24,12 @@ AgentJira is a graph of task nodes shared between humans and agents. Humans and 
 | `evaluating_soft_block` | **agent** | A soft-blocked node handed to the soft-block **judge** (a separate, supervisor-dispatched session) to decide: proceed, ask the human (→ `awaiting_human_response`), or defer (`reassess_after`). A general pickup agent should normally leave this — it's the judge's job |
 | `pr_raised` | github | PR open; GitHub review is the approval gate; the GHA merges and reports back |
 | `pr_changes_requested` | **agent** | Reviewer requested changes / left inline comments; address them, then `aj resubmit` → `pr_raised` |
+| `pr_base_moved` | **agent** | Another PR merged while this one waited for review, so the branch is behind main. Merge main in, check what landed against the branch, then `aj resubmit` → `pr_raised` |
 | `done` | none | Merged (or completed); `merge_sha` recorded |
 | `invalidated` | none | Marked wrong; reason recorded; kept forever as context |
 
 The **agent-turn statuses** — the only ones you may act on — are exactly:
-`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`.
+`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`, `pr_base_moved`.
 (`evaluating_soft_block` is dispatched to the soft-block judge by the supervisor — a general pickup agent should skip it.)
 
 Everything else is a human's turn, GitHub's turn, or terminal. Never fake a human's turn (e.g. never approve your own split or spec).

@@ -29,6 +29,10 @@ export const STATUS_META: Record<NodeStatus, StatusMeta> = {
   evaluating_soft_block: { color: '#d9a441', alpha: 1, turn: 'agent', label: 'Evaluating soft block' },
   pr_raised: { color: '#9775fa', alpha: 1, turn: 'github', label: 'PR raised' },
   pr_changes_requested: { color: '#7048e8', alpha: 1, turn: 'agent', label: 'PR changes requested' },
+  // Grape, not another violet: agent-turn cards carry their status color as a
+  // thin border + accent bar, where #7048e8 and #9775fa are already hard to tell
+  // apart. A separate hue keeps the two PR side loops distinguishable.
+  pr_base_moved: { color: '#ae3ec9', alpha: 1, turn: 'agent', label: 'PR base moved' },
   broken_down: { color: '#748ffc', alpha: 0.5, turn: 'none', label: 'Broken down' },
   done: { color: '#40c057', alpha: 0.7, turn: 'none', label: 'Done' },
   invalidated: { color: '#868e96', alpha: 1, turn: 'none', label: 'Invalidated' },

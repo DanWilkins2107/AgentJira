@@ -21,7 +21,7 @@ A general "pick up AgentJira work" request (no specific node named) makes you an
 aj tasks [-p <project>]
 ```
 
-Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`), annotated with claims and block-family blockers (firm/soft, their `_plan` variants, `reassess_after`) with their statuses. **Stale** nodes — an ancestor is currently `invalidated` (derived, never stored) — do not appear at all: they are dead until the ancestor is restored, and reappear automatically when it is.
+Lists nodes in the agent-turn statuses (`awaiting_agent_breakdown`, `split_approved`, `awaiting_agent_spec`, `ready_for_pickup`, `evaluating_soft_block`, `pr_changes_requested`, `pr_base_moved`), annotated with claims and block-family blockers (firm/soft, their `_plan` variants, `reassess_after`) with their statuses. **Stale** nodes — an ancestor is currently `invalidated` (derived, never stored) — do not appear at all: they are dead until the ancestor is restored, and reappear automatically when it is.
 
 Aj tasks is the source of truth. I may have picked up work and done reviews in the meantime, trust this over conversation history. 
 
@@ -105,6 +105,7 @@ First invoke the stage-notes skill for this node's current status — `aj-stage-
 | `split_approved` | Follow the `aj-breakdown` skill: materialize the approved children |
 | `awaiting_agent_spec` | Write a tiny, concise spec; `aj submit-spec <node> --file <path>`. If it plans out code, invoke `code-style-guide` and follow it |
 | `ready_for_pickup` | Follow the `aj-implement` skill: implement and raise the PR |
+| `pr_changes_requested` / `pr_base_moved` | Follow the `aj-implement` skill, final sections: address the review, or reconcile the branch with main |
 
 If anything is ambiguous, ask early: `aj post <node> --type question --body "..."` (this hands the turn to the human, which releases your claim automatically) — then move on.
 

@@ -10,7 +10,7 @@ Skills that teach a Claude Code session the AgentJira workflow: how to read the 
 | `aj-pickup` | "Pick up a task" / start a session without a specific node |
 | `aj-breakdown` | Nodes at `awaiting_agent_breakdown` or `split_approved` |
 | `aj-implement` | Nodes at `ready_for_pickup` |
-| `aj-stage-notes-<status>` | One per agent-turn status (`awaiting-agent-breakdown`, `split-approved`, `awaiting-agent-spec`, `ready-for-pickup`, `evaluating-soft-block`, `pr-changes-requested`). Invoked by the three skills above to load this project's instructions for the stage — including how long specs, split proposals and PR bodies should be |
+| `aj-stage-notes-<status>` | One per agent-turn status (`awaiting-agent-breakdown`, `split-approved`, `awaiting-agent-spec`, `ready-for-pickup`, `evaluating-soft-block`, `pr-changes-requested`, `pr-base-moved`). Invoked by the three skills above to load this project's instructions for the stage — including how long specs, split proposals and PR bodies should be |
 
 ## Prerequisite: the `aj` CLI
 
