@@ -1,0 +1,16 @@
+diff --git a/node_modules/@xyflow/system/dist/esm/index.js b/node_modules/@xyflow/system/dist/esm/index.js
+index 6342c49..b308419 100644
+--- a/node_modules/@xyflow/system/dist/esm/index.js
++++ b/node_modules/@xyflow/system/dist/esm/index.js
+@@ -2989,6 +2989,11 @@ function XYPanZoom({ domNode, minZoom, maxZoom, translateExtent, viewport, onPan
+     }
+     function destroy() {
+         d3ZoomInstance.on('zoom', null);
++        // PATCH: nulling the listener on the zoom BEHAVIOR leaves every `*.zoom`
++        // entry in the pane's d3 `__on` array. Those closures reach d3ZoomInstance
++        // -> zoomPanValues -> the onPanZoom* callbacks -> the store, so a detached
++        // pane stayed wired to a live object graph. Clear the DOM side too.
++        d3Selection.on('.zoom', null);
+     }
+     async function setViewportConstrained(viewport, extent, translateExtent) {
+         const nextTransform = viewportToTransform(viewport);

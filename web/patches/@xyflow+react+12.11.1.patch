@@ -1,0 +1,21 @@
+diff --git a/node_modules/@xyflow/react/dist/esm/index.js b/node_modules/@xyflow/react/dist/esm/index.js
+index 31bd7db..d3c58a9 100644
+--- a/node_modules/@xyflow/react/dist/esm/index.js
++++ b/node_modules/@xyflow/react/dist/esm/index.js
+@@ -1274,9 +1274,13 @@ function useResizeHandler(domNode) {
+             resizeObserver.observe(domNode.current);
+             return () => {
+                 window.removeEventListener('resize', updateDimensions);
+-                if (resizeObserver && domNode.current) {
+-                    resizeObserver.unobserve(domNode.current);
+-                }
++                // PATCH: was `if (resizeObserver && domNode.current) unobserve(...)`.
++                // React nulls host refs in the mutation phase, and passive effect
++                // destroys run after it, so domNode.current is ALWAYS null here and
++                // the observer was never released. It then kept observing a detached
++                // .react-flow__renderer, which in WebKit is a GC root that retains the
++                // whole board subtree and the zustand store — ~3 MB per unmount.
++                resizeObserver.disconnect();
+             };
+         }
+     }, []);

@@ -1,7 +1,7 @@
 import { MarkerType, ReactFlow, Panel } from '@xyflow/react'
 import type { Edge as FlowEdge, NodeMouseHandler } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Legend } from '../components/Legend'
 import { NewNodeDialog } from '../components/NewNodeDialog'
@@ -93,6 +93,38 @@ export function GraphPage() {
     },
     [doneKey],
   )
+
+  // Container pixels, measured before React Flow mounts. Without them React Flow
+  // has no way to compute a fitted transform up front, so it paints one frame at
+  // the DEFAULT viewport — zoom 1 — with every card laid out across the board's
+  // full extent (~19800 x 4400 px at 100 nodes). `fitView` only lands later, from
+  // updateNodeInternals, once the cards have mounted and been measured — so the
+  // board is styled, laid out and painted twice, once uselessly. (It is NOT a
+  // giant backing store: WebKit rasterizes at the effective scale and tiles, so
+  // the wasted work is layout and paint, not texture memory.)
+  // Passing width/height lets getInitialState fit BEFORE the first render, so the
+  // zoom-1 frame never exists. Both fields are init-only (React Flow keeps its own
+  // live size via its resize handler), so we only need them right before mount.
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const apply = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return
+      setCanvasSize((prev) =>
+        prev && prev.width === width && prev.height === height ? prev : { width, height },
+      )
+    }
+    const rect = el.getBoundingClientRect()
+    apply(rect.width, rect.height)
+    const ro = new ResizeObserver(([entry]) => {
+      const box = entry.contentRect
+      apply(box.width, box.height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const lastLoadAt = useRef(0)
   const load = useCallback(async () => {
@@ -216,16 +248,26 @@ export function GraphPage() {
             }
           : undefined
       const box = boxes.get(n.id)
+      const width = box?.width ?? NODE_WIDTH
+      const height = box?.height ?? NODE_HEIGHT
       return {
         id: n.id,
         type: 'task' as const,
         position: box ? { x: box.x, y: box.y } : { x: 0, y: 0 },
-        // Declared up front so React Flow can cull off-screen cards on the very
-        // first pass. Without these it has to mount every node and measure it
-        // with a ResizeObserver before it knows what is visible — on a large
-        // board that is the whole graph in the DOM before any culling happens.
-        width: box?.width ?? NODE_WIDTH,
-        height: box?.height ?? NODE_HEIGHT,
+        // Card size, declared rather than measured. These do NOT switch culling
+        // on: `onlyRenderVisibleElements` tests `internals.handleBounds`, not
+        // dimensions, and handleBounds only exists once a card has been in the
+        // DOM. What they do buy is a correct layout on the first paint and, via
+        // the ReactFlow width/height props, a fitted initial viewport.
+        width,
+        height,
+        // `measured` is what keeps culling alive across refetches. adoptUserNodes
+        // compares user nodes by OBJECT IDENTITY, and this memo rebuilds them
+        // every pass, so the equality fast path always misses and every node is
+        // re-adopted. On re-adoption parseHandles keeps the previous handleBounds
+        // only if `measured` is set — otherwise it nulls it, every card counts as
+        // never-rendered again, and the whole board re-mounts on each refetch.
+        measured: { width, height },
         data: {
           task: n,
           stale: invalidSet.has(n.id) && n.status !== 'invalidated',
@@ -233,7 +275,7 @@ export function GraphPage() {
           blocked: blockedSet.has(n.id),
           softBlocked: softSet.has(n.id),
           container,
-          size: { width: box?.width ?? NODE_WIDTH, height: box?.height ?? NODE_HEIGHT },
+          size: { width, height },
         },
       }
     })
@@ -307,7 +349,7 @@ export function GraphPage() {
         </button>
       </div>
       {error ? <div className="form-error">{error}</div> : null}
-      <div className="graph-canvas">
+      <div className="graph-canvas" ref={canvasRef}>
         {allHidden ? (
           <div className="graph-empty-state">
             All {taskNodes.length} node{taskNodes.length === 1 ? ' is' : 's are'} hidden by the
@@ -318,13 +360,20 @@ export function GraphPage() {
             once-only init fit against the real nodes. Mounting it while nodes are
             still empty (e.g. remounting after navigating back from a node) fits to
             nothing and leaves the graph panned off-screen — looking empty. */}
-        {loaded ? (
+        {loaded && canvasSize ? (
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
             fitView
+            // With fitView, these let React Flow compute the fitted transform at
+            // store-creation time — before the first render — instead of painting
+            // the board at zoom 1 and fitting afterwards. Init-only: React Flow
+            // tracks the live container size itself, so later resizes are handled
+            // without re-mounting.
+            width={canvasSize.width}
+            height={canvasSize.height}
             // A tidy tree is about as wide as it has leaves: the 93-node board
             // measures 18672 x 4152 px, which needs zoom 0.021 to fit. The old
             // 0.1 floor clamped `fitView` to 5x too close, so a big board opened
