@@ -10,6 +10,11 @@ Please be really concise. I can review from the code any specifics, I don't need
 State any points to pay attention to - e.g. security, in a bit more detail, but even then not too much. 
 Should generally be a quick check of what you're going to do, not a full on specification for every single little thing in depth - I can check the PR review for this. 
 
+Do not specify anything to do with testing, I can check that on the PR.
+Do not specify specific files you will create, just the concepts.
+Generally, we should range from about 4 lines (even accounting for bullet points) to a maximum of about 10 lines. I'm reviewing overall direction, not content.
+
+
 ## Examples
 **Instead of** something long like this:
 ```
