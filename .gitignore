@@ -14,3 +14,4 @@ coverage/
 *.tsbuildinfo
 envkey.pem
 .worktrees
+.claude/worktrees/
