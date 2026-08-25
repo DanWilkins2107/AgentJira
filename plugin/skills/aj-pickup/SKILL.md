@@ -44,6 +44,10 @@ Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parall
 
 Never point two subagents at the same node. If `aj tasks` showed no agent-turn work, don't invent work or do it yourself — go to step 4 and wait for the board to change.
 
+**Every dispatch is a fresh subagent — never reuse one.** A node that comes back to your queue is a new dispatch: a rejected spec returning to `awaiting_agent_spec`, a `pr_changes_requested` or `pr_base_moved` round-trip, a re-judged `evaluating_soft_block`. Spawn a **new** subagent for it. Do not resume the agent that worked it before, and do not keep one alive waiting for the human's decision — a subagent's job ends when it hands the turn over.
+
+The old agent is carrying its entire first pass in context, and almost none of that is what the revision needs. The review comment says what to change, and `aj context` reprints the node, its spec, and the full thread — so a fresh agent reads the board's *current* state cheaply, where a resumed one is remembering a stale version of it at the cost of everything it did to get there.
+
 ## Orchestrator — step 4: monitor the board
 
 Subagents keep running for a while, and their status changes unblock other nodes. Arm a persistent Monitor right after dispatching so new agent-turn work reaches you instead of waiting for the next manual `aj tasks`:
@@ -126,3 +130,7 @@ aj unclaim <node>
 ```
 
 Never leave a claim dangling on work you're not actively doing.
+
+## 6. Stop
+
+Handing the turn over is the end of your job — not a pause in it. Report your one line to the orchestrator and stop. Don't wait around for the human to approve your spec or review your PR: whatever comes back is a fresh dispatch to a fresh subagent, and it will load what it needs from the board.
