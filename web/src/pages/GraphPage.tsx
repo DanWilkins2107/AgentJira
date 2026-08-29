@@ -19,17 +19,10 @@ import {
   subtreeCompleteIds,
 } from '../lib/pickup'
 import { EDGE_STYLE } from '../lib/statusMeta'
-import { supabase } from '../lib/supabase'
-import { GRAPH_NODE_COLUMNS } from '../lib/types'
-import type { GraphNode, NodeEdge, Project } from '../lib/types'
+import { useProjectGraph } from '../lib/useProjectGraph'
+import type { NodeEdge } from '../lib/types'
 
 const nodeTypes = { task: TaskNodeView }
-
-/** Floor between refetches. `focus` fires every time the browser is
- * foregrounded — constantly on a phone — and each refetch relayouts the whole
- * board, so an unthrottled listener is pure churn on the device least able to
- * absorb it. Doubles as an in-flight guard: the stamp is taken on entry. */
-const REFETCH_MIN_MS = 10_000
 
 /** Per-edge-type rendering: subtask = ubiquitous scaffolding (thinner, faded);
  * blocks = emphasized on top; relates_to = faint context. */
@@ -55,11 +48,14 @@ const BLOCK_FAMILY: ReadonlySet<NodeEdge['type']> = new Set([
 export function GraphPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const [project, setProject] = useState<Project | null>(null)
-  const [taskNodes, setTaskNodes] = useState<GraphNode[]>([])
-  const [taskEdges, setTaskEdges] = useState<NodeEdge[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  // Same feed as the mobile queue view — one fetch, one refetch policy.
+  const {
+    project,
+    nodes: taskNodes,
+    edges: taskEdges,
+    error,
+    loaded,
+  } = useProjectGraph(projectId)
   const [showNewNode, setShowNewNode] = useState(false)
 
   // Human-view convenience only — agents are always served invalidated
@@ -125,40 +121,6 @@ export function GraphPage() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-
-  const lastLoadAt = useRef(0)
-  const load = useCallback(async () => {
-    if (!projectId) return
-    lastLoadAt.current = Date.now()
-    const [projRes, nodesRes, edgesRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', projectId).single(),
-      // Only the columns the board reads — never `*`, which drags every node's
-      // tldraw_doc, body and spec across the wire for a view that shows none
-      // of them (see GRAPH_NODE_COLUMNS).
-      supabase.from('nodes').select(GRAPH_NODE_COLUMNS).eq('project_id', projectId),
-      supabase.from('edges').select('*').eq('project_id', projectId).is('removed_at', null),
-    ])
-    const err = projRes.error ?? nodesRes.error ?? edgesRes.error
-    if (err) {
-      setError(err.message)
-      return
-    }
-    setError(null)
-    setProject(projRes.data as Project)
-    setTaskNodes((nodesRes.data ?? []) as GraphNode[])
-    setTaskEdges((edgesRes.data ?? []) as NodeEdge[])
-    setLoaded(true)
-  }, [projectId])
-
-  useEffect(() => {
-    void load()
-    const onFocus = () => {
-      if (document.hidden || Date.now() - lastLoadAt.current < REFETCH_MIN_MS) return
-      void load()
-    }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [load])
 
   const { flowNodes, flowEdges } = useMemo(() => {
     // Derived, never persisted: subtask descendants of an invalidated node are

@@ -63,11 +63,16 @@ export interface NodeBox {
  * primary parent are roots; a pure subtask cycle (no root reachable) has its
  * first-seen member promoted to a root so nothing is dropped.
  */
-export function treeLayout(nodes: GraphNode[], edges: NodeEdge[]): Map<string, NodeBox> {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const nodeIds = new Set(byId.keys())
-
-  // Primary parent = oldest incoming subtask edge (deterministic tie-break on id).
+/**
+ * Each node's PRIMARY subtask parent: its oldest incoming subtask edge
+ * (deterministic tie-break on id). The graph is a DAG — a node may have several
+ * subtask parents — so this one choice is what turns it into the tree the layout
+ * draws, and the same chain the queue view walks for a node's breadcrumb.
+ * Restricted to edges whose BOTH ends are in `nodes`, so a filtered view never
+ * points at a node that isn't there.
+ */
+export function primaryParents(nodes: GraphNode[], edges: NodeEdge[]): Map<string, string> {
+  const nodeIds = new Set(nodes.map((n) => n.id))
   const subtaskEdges = edges
     .filter(
       (e) =>
@@ -83,6 +88,14 @@ export function treeLayout(nodes: GraphNode[], edges: NodeEdge[]): Map<string, N
   for (const e of subtaskEdges) {
     if (!primaryParent.has(e.target_id)) primaryParent.set(e.target_id, e.source_id)
   }
+  return primaryParent
+}
+
+export function treeLayout(nodes: GraphNode[], edges: NodeEdge[]): Map<string, NodeBox> {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const nodeIds = new Set(byId.keys())
+
+  const primaryParent = primaryParents(nodes, edges)
 
   const childrenOf = new Map<string, string[]>()
   for (const [child, parent] of primaryParent) {

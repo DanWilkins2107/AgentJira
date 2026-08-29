@@ -1,3 +1,4 @@
+import { treeLayout } from './graphLayout'
 import { STATUS_META } from './statusMeta'
 import type { GraphNode, NodeEdge } from './types'
 
@@ -228,4 +229,46 @@ export function softBlockedIds(
     out.add(n.id)
   }
   return out
+}
+
+/**
+ * Nodes awaiting a PERSON right now — the mobile queue's contents, in the
+ * graph's own reading order (top to bottom, then left to right, from the same
+ * tidy-tree layout the desktop board draws). A node is queued iff:
+ *
+ *   - its turn is 'human' or 'github' (a raised PR awaits the human's review on
+ *     GitHub, which is still the person's move),
+ *   - it is not stale/invalidated — pass the derived set from
+ *     `effectivelyInvalidated`,
+ *   - it is not claimed — an agent already holds it, and
+ *   - it is not firmly gated (see `firmlyGatedTargets`): doing the work early is
+ *     wasted, so a gated card is not "available" whoever holds it.
+ *
+ * The human-turn mirror of `readyToPickupIds`. Pass the FULL node/edge sets so
+ * every blocker and every parent is present.
+ */
+export function humanQueue(
+  nodes: GraphNode[],
+  edges: NodeEdge[],
+  invalidSet: Set<string>,
+): GraphNode[] {
+  const blocked = blockedFromPickupIds(nodes, edges, invalidSet)
+  const boxes = treeLayout(nodes, edges)
+  return nodes
+    .filter((n) => {
+      const turn = STATUS_META[n.status].turn
+      if (turn !== 'human' && turn !== 'github') return false
+      if (invalidSet.has(n.id)) return false
+      if (n.claimed_by !== null) return false
+      return !blocked.has(n.id)
+    })
+    .sort((a, b) => {
+      const ba = boxes.get(a.id)
+      const bb = boxes.get(b.id)
+      return (
+        (ba?.y ?? 0) - (bb?.y ?? 0) ||
+        (ba?.x ?? 0) - (bb?.x ?? 0) ||
+        a.created_at.localeCompare(b.created_at)
+      )
+    })
 }

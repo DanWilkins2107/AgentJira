@@ -993,6 +993,153 @@ label {
   margin: 0;
 }
 
+/* ---- mobile queue (phone view of a project: one awaiting-you node per card) ---- */
+
+.queue-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.queue-toolbar h1 {
+  flex: 1 1 auto;
+}
+.queue-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.queue-count {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.queue-track {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.queue-track-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.18s ease;
+}
+/* The deck. Native scroll-snap does the swiping: no touch handlers, no
+   transforms. Left and right padding MUST stay equal — QueuePage reads the card
+   index as scrollLeft / slideWidth, which only holds while the padding is
+   symmetric. `position: relative` keeps the slides' offsets measured from here. */
+.queue-deck {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 7%;
+  scrollbar-width: none;
+}
+.queue-deck::-webkit-scrollbar {
+  display: none;
+}
+.queue-slide {
+  flex: 0 0 86%;
+  display: flex;
+  padding: 0 6px;
+  scroll-snap-align: center;
+  /* One card per flick: a queue you skim past defeats the point. */
+  scroll-snap-stop: always;
+}
+.queue-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 2px solid;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(33, 37, 41, 0.1);
+  transition: transform 0.14s ease;
+}
+.queue-card,
+.queue-card:hover {
+  text-decoration: none;
+}
+.queue-card:active {
+  transform: scale(0.985);
+}
+.queue-crumb {
+  font-size: 12px;
+  opacity: 0.66;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-title {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.queue-vision {
+  opacity: 0.75;
+}
+.queue-card-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.queue-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.queue-turn {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.queue-open {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.queue-nav {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+.queue-nav button {
+  flex: 1;
+  padding: 12px;
+}
+.queue-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+}
+.queue-empty strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
 /* ---- mobile ---- */
 
 @media (max-width: 640px) {
@@ -1058,5 +1205,21 @@ label {
   }
   .legend-body {
     max-height: 55vh;
+  }
+  .queue-toolbar h1 {
+    order: 0;
+  }
+  .queue-toolbar .btn-small {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .queue-slide {
+    flex-basis: 92%;
+  }
+  .queue-deck {
+    padding: 12px 4%;
+  }
+  .queue-title {
+    font-size: 20px;
   }
 }
