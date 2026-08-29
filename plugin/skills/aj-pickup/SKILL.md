@@ -13,7 +13,9 @@ A general "pick up AgentJira work" request (no specific node named) makes you an
 
 **Pick up everything you can, in parallel.** Default is one subagent per actionable node, all dispatched at once — not one node at a time. Don't cherry-pick a single "best" task and leave the rest sitting; if six nodes are actionable, spawn six subagents. Only leave a node alone when it's genuinely not pickable (see step 2). Then keep watching the board (step 4) and dispatch again as work appears.
 
-> **Already handed one specific node?** If an orchestrator dispatched you to a single node id, you *are* the subagent: skip the orchestrator steps, go straight to **Working a node** below, do it directly, and never spawn a further subagent.
+> **Already handed one specific node?** If you were dispatched to a single node id — by an orchestrator or by the human directly — you *are* the subagent: skip the orchestrator steps, go straight to **Working a node** below, do it directly, and never spawn a further subagent.
+>
+> Before you write anything to the board, invoke **`agentjira-workflow`** and the **`aj-stage-notes-<status>`** skill for the node's status. Being handed a node id is not a shortcut past them: the rulebook is what stops you faking a human's turn, and the stage notes carry this project's length budget for whatever you're about to write. Both are cheap; neither is optional.
 
 ## Orchestrator — step 1: list available work
 
@@ -40,7 +42,8 @@ Spawn a subagent (Agent/Task tool) for each chosen node — issue them in parall
 
 - the **node id**, and the instruction to follow this `aj-pickup` skill's **Working a node** procedure for that one node;
 - a reminder that it must do the work **directly** — not spawn any further subagent — and must `aj unclaim` if it stops unfinished *without* a status change;
-- the instruction to finish with **one line** — node id, what stage it reached, and anything genuinely blocked. No summary of the work; the board carries that.
+- the instruction to finish with **one line** — node id, what stage it reached, and anything genuinely blocked. No summary of the work; the board carries that;
+- the instruction to invoke **`agentjira-workflow`** and its **`aj-stage-notes-<status>`** skill before writing anything to the board. Name them in the dispatch; a subagent that never loads them writes to no budget at all, and long is the default failure.
 
 Never point two subagents at the same node. If `aj tasks` showed no agent-turn work, don't invent work or do it yourself — go to step 4 and wait for the board to change.
 

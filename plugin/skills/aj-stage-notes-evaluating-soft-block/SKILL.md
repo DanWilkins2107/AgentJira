@@ -9,3 +9,5 @@ Consider reversibility - is the wrong decision here going to cause major problem
 Similarly, consider how unblocking this work is. If there's already a ton of unblocked work then the marginal gain on unblocking this new bit is low.
 Do not pick up work where PRs will need to be stacked. Wait until the preceding work is done - change to a hard block in this case.
 Most changes should realistically change to a hard block.
+
+Whatever you post — the judgment, a question, or the reason for deferring — keep it to a couple of lines. I want the call and the reason for it, not the reasoning that got you there.

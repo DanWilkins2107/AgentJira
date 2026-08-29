@@ -115,6 +115,20 @@ Every word you put on the board is read by a human. **Shorter is always better.*
 
 **The project may have set the bar for you.** The `aj-stage-notes-<status>` skill for the stage you're working carries this project's length budget, and often a worked long-vs-short example. Load it before you write and match it.
 
+**Where the stage notes are silent, these are the defaults.** They are ceilings, not targets — most of what you write should come in under them:
+
+| What you're writing | Budget |
+|---|---|
+| Spec | 4-10 lines |
+| Split proposal | one line per child, plus a line of reasoning |
+| PR body | 5 bullets, on top of the fixed node marker |
+| Question | 3 lines — what you need and why it blocks you |
+| Note on a node | 1-2 lines |
+| Review reply | 1-3 lines, on the PR, not the node |
+| `aj resubmit --body` | 1 line |
+
+Over budget means cut, not reformat. The usual culprits are all things the human can already see: restating the node's own title and body, narrating what you did rather than what changed, listing every file you touched, and writing up checks that the PR diff and CI already show.
+
 ## Plan-deliverable nodes — breakdown on merge
 
 Some nodes deliver a **plan/spec document committed to the repo**, not working code. For those, `done` is wrong after the merge — the planned work still has to be split into tasks. Before raising the PR, flag the node:
