@@ -6,4 +6,4 @@ description: Stage notes for pr_changes_requested. Load before starting any pr_c
 
 Write any responses to review comments on the PR - we do not need this to be on the node. If we hit real blockers, maybe that's the time to swap to the node, for example big scope refactor questions should be moved to "ask user question".
 
-Keep replies to a line or three. What changed, or why you disagree — I can see the diff, so don't restate it or re-explain the original approach.
+Replies can run longer than anything you write on the board — I've asked a question, so answer it properly rather than clipping it to a line. Make the argument if you disagree. Still don't restate the diff back at me or re-explain the original approach; it's the reasoning that's worth reading.

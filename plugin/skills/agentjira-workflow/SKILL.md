@@ -124,10 +124,10 @@ Every word you put on the board is read by a human. **Shorter is always better.*
 | PR body | 5 bullets, on top of the fixed node marker |
 | Question | 3 lines — what you need and why it blocks you |
 | Note on a node | 1-2 lines |
-| Review reply | 1-3 lines, on the PR, not the node |
+| Review reply | as long as the point needs — on the PR, not the node |
 | `aj resubmit --body` | 1 line |
 
-Over budget means cut, not reformat. The usual culprits are all things the human can already see: restating the node's own title and body, narrating what you did rather than what changed, listing every file you touched, and writing up checks that the PR diff and CI already show.
+Review replies are the exception: they are a conversation with a reviewer who has asked you something, so give the reasoning properly rather than clipping it to fit. Everywhere else, over budget means cut, not reformat. The usual culprits are all things the human can already see: restating the node's own title and body, narrating what you did rather than what changed, listing every file you touched, and writing up checks that the PR diff and CI already show.
 
 ## Plan-deliverable nodes — breakdown on merge
 
