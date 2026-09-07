@@ -32,8 +32,8 @@ interface BlockerInfo {
   blocker_title: string;
   blocker_status: NodeStatus | 'unknown';
   // False once the blocker no longer gates: for plan variants, when its plan has
-  // landed (status done OR merge_sha recorded); for a plain block on a
-  // broken_down source, when that source's subtree is complete.
+  // landed (status done OR broken_down OR merge_sha recorded); for a plain block
+  // on a broken_down source, when that source's subtree is complete.
   unfinished: boolean;
 }
 
@@ -174,9 +174,12 @@ export function registerTasks(program: Command): void {
         for (const n of nodes) {
           const blockers: BlockerInfo[] = (edgesByTarget.get(n.id) ?? []).map((e) => {
             const b = blockerNodes.get(e.source_id);
-            // Plan variants are satisfied once the blocker's plan LANDS (done OR
-            // merge_sha recorded). A plain block on a broken_down source is a
-            // coarse block, satisfied when that source's subtree is complete.
+            // Plan variants are satisfied once the blocker's plan LANDS: status
+            // done, status broken_down (the approved split IS the decision,
+            // materialized — a node broken down without a plan-document PR never
+            // reaches done or a merge_sha), OR a merge_sha recorded. A PLAIN
+            // block on a broken_down source is a different thing — a coarse
+            // block, satisfied only when that source's subtree is complete.
             // Everything else waits for done. Unknown blockers count as
             // unfinished; a missing RPC row is the safe default (unfinished).
             const planVariant = e.type === 'firm_block_plan' || e.type === 'soft_block_plan';
@@ -184,7 +187,8 @@ export function registerTasks(program: Command): void {
             if (!b) {
               unfinished = true;
             } else if (planVariant) {
-              unfinished = b.status !== 'done' && b.merge_sha === null;
+              unfinished =
+                b.status !== 'done' && b.status !== 'broken_down' && b.merge_sha === null;
             } else if (b.status === 'broken_down') {
               unfinished = !(subtreeComplete.get(e.source_id) ?? false);
             } else {

@@ -159,7 +159,7 @@ aj create-node -p "My App" --title "Create the Stripe account" --status human_on
 
 ### `aj add-edge --type <edge_type> --from <node> --to <node>`
 
-Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `firm_block_plan`, `soft_block`, `soft_block_plan`, `reassess_after`, `relates_to`. Both nodes must be in the same project. The `_plan` variants gate like their base type only until the source's **plan lands** (source `done` OR `merge_sha` recorded) — use them when the target depends on the source's decision/plan document, not on its full implementation.
+Create an edge; reading is always **source → target**. Types: `subtask`, `firm_block`, `firm_block_plan`, `soft_block`, `soft_block_plan`, `reassess_after`, `relates_to`. Both nodes must be in the same project. The `_plan` variants gate like their base type only until the source's **plan lands** (source `done`, `broken_down`, OR `merge_sha` recorded) — use them when the target depends on the source's decision/plan, not on its full implementation. `broken_down` counts: the approved split *is* the decision, materialized. (A PLAIN block from a `broken_down` source is a coarse block instead — it keeps gating until that source's whole subtree completes.)
 
 ```sh
 aj add-edge --type firm_block --from 9a8b7c --to 3f2a1b   # 9a8b7c firm-blocks 3f2a1b

@@ -62,11 +62,14 @@ export function registerContext(program: Command): void {
         const canvases = await downloadCanvases(sb, node, ancestorIds);
 
         // Coarse (broken-down) blockers no longer gate once their subtree is
-        // complete; resolve that so the annotation can say which it is.
+        // complete; resolve that so the annotation can say which it is. Only
+        // PLAIN blocks are coarse: a `_plan` edge from a broken_down source is
+        // already satisfied by the breakdown itself (see `planLanded` below), so
+        // its subtree is irrelevant.
         const brokenDownBlockerIds = [
           ...new Set(
             asObjArray(context['blockers'])
-              .filter((b) => strField(b, 'status') === 'broken_down')
+              .filter((b) => strField(b, 'status') === 'broken_down' && !isPlanBlock(b))
               .map((b) => strField(b, 'id'))
               .filter((id): id is string => id !== null),
           ),
@@ -223,10 +226,17 @@ function printHuman(
   if (blockers.length === 0) console.log('  (none)');
   for (const b of blockers) {
     let line = summarizeNodeish(b);
-    // A broken-down blocker is a coarse, parent-level block: hidden from the
-    // graph but still real. It gates until its whole subtree is complete, then
-    // stops — surface which, in words, rather than as an edge the reader can't see.
-    if (strField(b, 'status') === 'broken_down') {
+    if (isPlanBlock(b)) {
+      // A `_plan` edge asks only for the blocker's DECISION, so it stops gating
+      // the moment that decision lands — see `planLanded`.
+      line += planLanded(b)
+        ? '  ⟵ plan block — PLAN LANDED: decision available, no longer gating'
+        : "  ⟵ plan block — gating until the blocker's plan lands";
+    } else if (strField(b, 'status') === 'broken_down') {
+      // A broken-down blocker on a PLAIN block is a coarse, parent-level block:
+      // hidden from the graph but still real. It gates until its whole subtree is
+      // complete, then stops — surface which, in words, rather than as an edge
+      // the reader can't see.
       const id = strField(b, 'id');
       const complete = id !== null ? coarseComplete.get(id) : undefined;
       line +=
@@ -303,6 +313,26 @@ function summarizeNodeish(o: Obj): string {
     line += `  !! INVALIDATED${reason !== null ? `: ${reason}` : ''}`;
   }
   return line;
+}
+
+/** Is this `node_context` blocker row a `_plan` variant block edge? */
+function isPlanBlock(b: Obj): boolean {
+  const type = strField(b, 'block_type');
+  return type === 'firm_block_plan' || type === 'soft_block_plan';
+}
+
+/**
+ * Has this blocker's plan LANDED — the satisfaction point for `_plan` block
+ * edges? The edge asks for the blocker's DECISION, not its implementation, and
+ * that decision exists once the blocker is `done`, has a `merge_sha` recorded,
+ * or is `broken_down` (the approved split IS the decision, materialized — a
+ * node broken down without a plan-document PR reaches neither of the other
+ * two). Mirrors `planLanded` in web/src/lib/pickup.ts and the plan-variant rule
+ * in `aj tasks`.
+ */
+function planLanded(b: Obj): boolean {
+  const status = strField(b, 'status');
+  return status === 'done' || status === 'broken_down' || strField(b, 'merge_sha') !== null;
 }
 
 function isObj(v: unknown): v is Obj {

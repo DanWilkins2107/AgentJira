@@ -144,6 +144,10 @@ export function GraphPage() {
     const gatesBySource = new Map<string, number>()
     for (const e of taskEdges) {
       if (e.removed_at !== null || !BLOCK_FAMILY.has(e.type)) continue
+      // A `_plan` edge from a broken_down source is already satisfied (the split
+      // IS the decision landing — see `planLanded`), so it holds nobody back and
+      // must not inflate the container's "gates N nodes" count.
+      if (e.type === 'firm_block_plan' || e.type === 'soft_block_plan') continue
       gatesBySource.set(e.source_id, (gatesBySource.get(e.source_id) ?? 0) + 1)
     }
 
@@ -170,10 +174,15 @@ export function GraphPage() {
     // once the parent's subtree completes, so a BLOCKED node has a visible,
     // self-resolving cause. A block pointing INTO a broken_down node (target
     // broken_down, source not) is the noisy direction the demotion existed to
-    // hide — keep that one dropped.
+    // hide — keep that one dropped. A `_plan` edge from a broken_down source is
+    // NOT a coarse gate: the split IS its decision landing, so it is already
+    // satisfied (see `planLanded`) and keeps its own plan-block styling, faded.
     const nodeById = new Map(visibleNodes.map((n) => [n.id, n]))
     const isCoarseGate = (e: NodeEdge): boolean =>
-      BLOCK_FAMILY.has(e.type) && nodeById.get(e.source_id)?.status === 'broken_down'
+      BLOCK_FAMILY.has(e.type) &&
+      e.type !== 'firm_block_plan' &&
+      e.type !== 'soft_block_plan' &&
+      nodeById.get(e.source_id)?.status === 'broken_down'
     const isBlockIntoContainer = (e: NodeEdge): boolean =>
       BLOCK_FAMILY.has(e.type) &&
       nodeById.get(e.source_id)?.status !== 'broken_down' &&
