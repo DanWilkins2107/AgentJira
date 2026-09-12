@@ -56,16 +56,27 @@ The old agent is carrying its entire first pass in context, and almost none of t
 Subagents keep running for a while, and their status changes unblock other nodes. Arm a persistent Monitor right after dispatching so new agent-turn work reaches you instead of waiting for the next manual `aj tasks`:
 
 ```bash
-prev=""
+prev=""; seeded=0; fails=0
 while true; do
-  cur=$(aj tasks 2>/dev/null | awk '/^RECOMMENDED/{r=1;next} /^NOT RECOMMENDED/{r=0} r && /^  [^ ]/ && !/\(none\)/{print "NEW" $0}' | sort)
-  [ -n "$prev" ] && comm -13 <(echo "$prev") <(echo "$cur")
-  prev="$cur"
+  out=$(aj tasks 2>&1); rc=$?
+  if [ $rc -ne 0 ] || ! printf '%s\n' "$out" | grep -q '^RECOMMENDED'; then
+    # A failed poll must not overwrite the baseline, or anything that appears meanwhile is silently absorbed.
+    fails=$((fails+1))
+    [ "$fails" -eq 3 ] && echo "WARN aj tasks failing 3 polls in a row: $(printf '%s\n' "$out" | tail -1)"
+    sleep 60; continue
+  fi
+  [ "$fails" -ge 3 ] && echo "OK aj tasks recovered after $fails failed polls"
+  fails=0
+  cur=$(printf '%s\n' "$out" | awk '/^RECOMMENDED/{r=1;next} /^NOT RECOMMENDED/{r=0} r && /^  [^ ]/ && !/\(none\)/{print "NEW" $0}' | sort)
+  if [ "$seeded" -eq 1 ]; then
+    comm -13 <(printf '%s\n' "$prev") <(printf '%s\n' "$cur") | grep --line-buffered -v '^$'
+  fi
+  prev="$cur"; seeded=1
   sleep 60
 done
 ```
 
-Run it with `persistent: true` and a description like `AgentJira board — new actionable nodes`. First pass seeds the baseline silently; after that each line is a node that became actionable.
+Run it with `persistent: true` and a description like `AgentJira board — new actionable nodes`. The first successful poll seeds the baseline silently (an empty board is a valid baseline); after that each `NEW` line is a node that became actionable. A failed poll is skipped, never re-seeding the baseline, and three in a row print one `WARN` (then `OK` on recovery), so silence means a quiet board, not a dead backend. If step 1 used `-p <project>`, add it here too.
 
 When it fires: re-run `aj tasks`, apply step 2's judgment, and dispatch subagents for whatever is now pickable.
 
