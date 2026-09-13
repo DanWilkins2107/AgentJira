@@ -158,6 +158,37 @@ export function readyToPickupIds(
 }
 
 /**
+ * The agent side of the board, counted: how many nodes are an agent's to move,
+ * and how many of those an agent already holds.
+ *
+ * `available` is every agent-turn node that isn't dead or parked — the same
+ * exclusions as `readyToPickupIds` (not stale/invalidated, not firmly gated)
+ * MINUS the claim filter, so a node an agent is working on right now still
+ * counts as agent work. `inProgress` is exactly that claimed subset, so
+ * `available - inProgress` is `readyToPickupIds().size` — the queue waiting to
+ * be picked up.
+ *
+ * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
+ */
+export function agentWorkload(
+  nodes: GraphNode[],
+  edges: NodeEdge[],
+  invalidSet: Set<string>,
+): { available: number; inProgress: number } {
+  const gated = firmlyGatedTargets(nodes, edges)
+  let available = 0
+  let inProgress = 0
+  for (const n of nodes) {
+    if (STATUS_META[n.status].turn !== 'agent') continue
+    if (invalidSet.has(n.id)) continue // invalidated or stale
+    if (gated.has(n.id)) continue
+    available += 1
+    if (n.claimed_by !== null) inProgress += 1
+  }
+  return { available, inProgress }
+}
+
+/**
  * Node ids nobody should pick up yet because an unfinished firm-family gate
  * holds them — the exact reason they're sitting idle. Covers BOTH turns that
  * can act on a node: agent-turn (the complement of `readyToPickupIds` within
