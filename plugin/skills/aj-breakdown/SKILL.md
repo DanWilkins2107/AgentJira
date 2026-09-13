@@ -72,7 +72,7 @@ proposal, which they can approve or reject.
   **For every proposed block, name the variant and say why** — the human approves the edges too:
 
   - The target needs the blocker **built and merged** → `firm_block` / `soft_block`.
-  - The target only needs the blocker's **decision/plan document** → `firm_block_plan` / `soft_block_plan` (satisfied the moment the plan merges, even though the blocker then re-enters breakdown to split its follow-up work).
+  - The target only needs the blocker's **decision/plan** → `firm_block_plan` / `soft_block_plan` (satisfied the moment the plan lands — the plan document merges, or the blocker is broken down, since the approved split *is* the decision — even though the blocker's own follow-up work continues).
   - A child whose deliverable **is** a document (decision, design, plan) should be flagged in the proposal as a plan deliverable (`breakdown_on_merge`) — and blocks *from* it should almost always be the `_plan` variants.
 
   **Name the human-only children.** Splitting is the cheapest place to notice work no agent can do — accounts, payments, third-party dashboards, anything physical. Give each one its own numbered child marked HUMAN-ONLY, and firm-block whatever it holds up. Doing this here means the human sees their own queue up front instead of an agent hitting the wall days later. Err toward flagging: a mis-flagged child costs the human one status change, an un-flagged one strands an agent.
@@ -100,10 +100,12 @@ The human approved the proposal (read the thread — their `split_decision` mess
 
    Use the variant the approved proposal named. Rule of thumb (see the
    rulebook's "Choosing a block type"): target needs the blocker **built** →
-   base type; target only needs the blocker's **decision/plan document**
-   (typical when the blocker is a `breakdown_on_merge` node) →
-   `firm_block_plan` / `soft_block_plan`, which stop gating the moment the
-   plan merges rather than waiting for the whole implementation subtree.
+   base type; target only needs the blocker's **decision/plan**
+   (typical when the blocker is a `breakdown_on_merge` node, but also whenever
+   the blocker's own breakdown is the decision) →
+   `firm_block_plan` / `soft_block_plan`, which stop gating the moment the plan
+   lands — the document merges, or the blocker reaches `broken_down` — rather
+   than waiting for the whole implementation subtree.
 
    **Do NOT replicate the parent's outside blocks onto each child.** If the parent
    blocks some outside node T, that block stays on the parent — once you set the
@@ -112,6 +114,12 @@ The human approved the proposal (read the thread — their `split_decision` mess
    isn't lost. Fanning "child₁→T, child₂→T, child₃→T" just recreates the hairball the
    coarse-block demotion exists to prevent. Only attach a child→T block when that one
    child _specifically and solely_ carries the dependency (then retire the parent's).
+
+   One exception to "it stays a gate": if the parent's outside block is a `_plan`
+   variant, setting the parent `broken_down` **satisfies** it — T only ever needed
+   the decision, and the approved split is that decision. If T also turns out to
+   need a specific child's implementation, add an explicit block from that child
+   to T; don't convert the `_plan` edge back to a plain one.
 
 3. Set the parent to its container status:
 

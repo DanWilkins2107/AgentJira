@@ -157,7 +157,8 @@ export const EDGE_STYLE: Record<EdgeType, EdgeStyleMeta> = {
   subtask: { stroke: '#909296', label: 'subtask (parent → child)' },
   firm_block: { stroke: '#e03131', label: 'firm block' },
   // Plan variants: base color, distinct dash — gate only until the source's
-  // plan lands (done OR merge_sha recorded), then render dimmed (satisfied).
+  // plan lands (done OR broken_down OR merge_sha recorded — see `planLanded`),
+  // then render dimmed (satisfied).
   firm_block_plan: { stroke: '#e03131', dash: '12 5', label: 'firm block until plan lands' },
   soft_block: { stroke: '#f59f00', dash: '8 5', label: 'soft block' },
   soft_block_plan: { stroke: '#f59f00', dash: '3 4', label: 'soft block until plan lands' },

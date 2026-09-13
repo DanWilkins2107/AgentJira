@@ -30,7 +30,7 @@ Aj tasks is the source of truth. I may have picked up work and done reviews in t
 ## Orchestrator — step 2: choose candidates
 
 - Skip anything in the "not recommended" section (firm-blocked by unfinished work, deferred via `reassess_after`, or claimed by someone else).
-- A blocker annotated **PLAN LANDED** no longer gates: its decision/plan document has merged, and that's all this node needed from it (the edge was a `_plan` variant). It becomes required reading for whoever works the node.
+- A blocker annotated **PLAN LANDED** no longer gates: its decision has landed — the plan document merged, or the blocker was broken down (the approved split *is* the decision) — and that's all this node needed from it (the edge was a `_plan` variant). It becomes required reading for whoever works the node.
 - Prefer unblocked, unclaimed nodes. A blocker in `invalidated` status is a judgment signal, not a hard stop — read its invalidation reason before deciding.
 - A blocker in `human_only_action` is waiting on the human and nothing else — you cannot clear it, work around it, or do it yourself. Leave the node and pick something else; the human's queue is theirs.
 

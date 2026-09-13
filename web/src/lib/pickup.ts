@@ -4,12 +4,26 @@ import type { GraphNode, NodeEdge } from './types'
 
 /**
  * Has this node's plan LANDED? The satisfaction point for plan-variant block
- * edges (firm_block_plan / soft_block_plan): the node finished outright, or
- * its deliverable merged (typically a breakdown_on_merge node whose plan PR
- * merged and which re-entered breakdown to split the planned work).
+ * edges (firm_block_plan / soft_block_plan). A `_plan` edge asks for the
+ * source's DECISION, not its implementation, and that decision exists once:
+ *
+ *   - the node finished outright (`done`), or
+ *   - its deliverable merged (`merge_sha` — typically a breakdown_on_merge node
+ *     whose plan PR merged and which re-entered breakdown to split the work), or
+ *   - the node was BROKEN DOWN. Reaching `broken_down` *is* the decision
+ *     landing: the split has been approved and materialized. A node broken down
+ *     WITHOUT a plan-document PR reaches neither `done` nor a `merge_sha`, so
+ *     without this its `_plan` edges would gate their targets permanently.
+ *
+ * If a target also needs some child's implementation, that belongs as a new
+ * explicit block edge on the relevant child, added when needed.
+ *
+ * Deliberately NOT the rule for plain firm_block / soft_block from a
+ * broken_down source: those are coarse parent-level blocks that keep gating
+ * until the whole subtree completes (see `subtreeCompleteIds`).
  */
 export function planLanded(node: GraphNode): boolean {
-  return node.status === 'done' || node.merge_sha !== null
+  return node.status === 'done' || node.status === 'broken_down' || node.merge_sha !== null
 }
 
 /** Statuses that are NOT live work: terminal (done/invalidated) or a container
@@ -96,11 +110,11 @@ export function directChildrenSettled(
  * is held back from pickup. A firm_block or reassess_after gates until its
  * source is `done`, or — when the source is a `broken_down` parent (a coarse
  * block) — until its subtree is complete (see `subtreeCompleteIds`). A
- * firm_block_plan gates only until the source's PLAN LANDS (source `done` OR
- * merge_sha recorded), even while the source's own follow-up breakdown
- * continues. An unknown blocker (edge to a node we can't see) counts as
- * unfinished — same as `aj tasks`. Soft blocks (and soft_block_plan) never
- * gate: they are judgment, not a constraint.
+ * firm_block_plan gates only until the source's PLAN LANDS (source `done`,
+ * `broken_down`, OR merge_sha recorded — see `planLanded`), even while the
+ * source's own follow-up breakdown continues. An unknown blocker (edge to a node
+ * we can't see) counts as unfinished — same as `aj tasks`. Soft blocks (and
+ * soft_block_plan) never gate: they are judgment, not a constraint.
  *
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
@@ -225,8 +239,9 @@ export function blockedFromPickupIds(
  * shared-decision advice, not a gate (mirrors the "SOFT-BLOCKED" annotation in
  * `aj tasks`). A soft_block is active until its source is done (or, for a
  * broken_down source, its subtree is complete); a soft_block_plan until the
- * source's plan lands. Independent of firm-gating and claim: a node can be
- * ready AND soft-blocked, or firm-blocked AND soft-blocked — the tag is purely
+ * source's plan lands (`planLanded` — which a `broken_down` source already
+ * satisfies). Independent of firm-gating and claim: a node can be ready AND
+ * soft-blocked, or firm-blocked AND soft-blocked — the tag is purely
  * "shared decisions are still open upstream; picking up is a stretch".
  *
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
