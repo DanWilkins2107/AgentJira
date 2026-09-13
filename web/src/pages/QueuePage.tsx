@@ -4,7 +4,7 @@ import { NewNodeDialog } from '../components/NewNodeDialog'
 import { SearchBox } from '../components/SearchBox'
 import { primaryParents } from '../lib/graphLayout'
 import { effectivelyInvalidated } from '../lib/invalidation'
-import { humanQueue } from '../lib/pickup'
+import { agentWorkload, humanQueue } from '../lib/pickup'
 import { STATUS_META, TURN_LABEL, cardTreatment } from '../lib/statusMeta'
 import { useProjectGraph } from '../lib/useProjectGraph'
 import type { GraphNode } from '../lib/types'
@@ -64,7 +64,7 @@ export function QueuePage() {
   // Seeded from the URL once, so a reload mid-queue lands where you were.
   const anchorRef = useRef<string | null>(searchParams.get('card'))
 
-  const { queue, crumbs, withAgents } = useMemo(() => {
+  const { queue, crumbs, agents } = useMemo(() => {
     const invalid = effectivelyInvalidated(nodes, edges)
     const q = humanQueue(nodes, edges, invalid)
     const parents = primaryParents(nodes, edges)
@@ -73,10 +73,10 @@ export function QueuePage() {
       queue: q,
       crumbs: new Map(q.map((n) => [n.id, crumbFor(n.id, parents, titles)])),
       // Empty state only: "nothing for you" reads very differently when twenty
-      // nodes are moving than when the board is asleep.
-      withAgents: nodes.filter(
-        (n) => STATUS_META[n.status].turn === 'agent' && !invalid.has(n.id),
-      ).length,
+      // nodes are moving than when the board is asleep. Counts the agent side
+      // as an agent sees it — not every node on the board — so a board where
+      // everything is gated or done still reads as idle.
+      agents: agentWorkload(nodes, edges, invalid),
     }
   }, [nodes, edges])
 
@@ -153,11 +153,15 @@ export function QueuePage() {
       ) : queue.length === 0 ? (
         <div className="queue-empty">
           <strong>Nothing needs you right now.</strong>
-          <span>
-            {withAgents > 0
-              ? `${withAgents} node${withAgents === 1 ? ' is' : 's are'} with agents.`
-              : 'No agent-turn work either — the board is idle.'}
-          </span>
+          {agents.available > 0 ? (
+            <span>
+              {agents.available} node{agents.available === 1 ? '' : 's'} available to agents.
+              <br />
+              {agents.inProgress} of these {agents.inProgress === 1 ? 'is' : 'are'} in progress.
+            </span>
+          ) : (
+            <span>No agent-turn work either — the board is idle.</span>
+          )}
         </div>
       ) : (
         <>
