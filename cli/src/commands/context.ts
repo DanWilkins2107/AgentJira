@@ -65,11 +65,15 @@ export function registerContext(program: Command): void {
         // complete; resolve that so the annotation can say which it is. Only
         // PLAIN blocks are coarse: a `_plan` edge from a broken_down source is
         // already satisfied by the breakdown itself (see `planLanded` below), so
-        // its subtree is irrelevant.
+        // its subtree is irrelevant. A DEAD blocker is skipped too — it has
+        // already stopped gating (see `isDead`), so the lookup is moot.
         const brokenDownBlockerIds = [
           ...new Set(
             asObjArray(context['blockers'])
-              .filter((b) => strField(b, 'status') === 'broken_down' && !isPlanBlock(b))
+              .filter(
+                (b) =>
+                  strField(b, 'status') === 'broken_down' && !isPlanBlock(b) && !isDead(b),
+              )
               .map((b) => strField(b, 'id'))
               .filter((id): id is string => id !== null),
           ),
@@ -226,7 +230,15 @@ function printHuman(
   if (blockers.length === 0) console.log('  (none)');
   for (const b of blockers) {
     let line = summarizeNodeish(b);
-    if (isPlanBlock(b)) {
+    if (isDead(b)) {
+      // DEAD FIRST: an invalidated or stale blocker can never reach `done`, so
+      // it stops gating outright — whatever the edge type, and before any
+      // plan-variant or coarse-block reasoning. It stays listed (with its
+      // status, staleness and invalidation reason, from summarizeNodeish)
+      // because a dead dependency is still context worth reading.
+      line +=
+        '  ⟵ DEAD blocker (invalidated or stale) — no longer gating; read its invalidation reason before working this node';
+    } else if (isPlanBlock(b)) {
       // A `_plan` edge asks only for the blocker's DECISION, so it stops gating
       // the moment that decision lands — see `planLanded`.
       line += planLanded(b)
@@ -313,6 +325,18 @@ function summarizeNodeish(o: Obj): string {
     line += `  !! INVALIDATED${reason !== null ? `: ${reason}` : ''}`;
   }
   return line;
+}
+
+/**
+ * Is this `node_context` blocker row DEAD — its own status `invalidated`, or
+ * itself stale (an ancestor of it is invalidated)? A dead blocker can never
+ * reach `done`, so it stops gating its target entirely, for every block-family
+ * edge type. Mirrors the dead-blocker rule in `aj tasks` and
+ * `firmlyGatedTargets` / `softBlockedIds` in web/src/lib/pickup.ts. The `stale`
+ * field is the DERIVED value the RPC computes; no extra query is needed.
+ */
+function isDead(b: Obj): boolean {
+  return strField(b, 'status') === 'invalidated' || b['stale'] === true;
 }
 
 /** Is this `node_context` blocker row a `_plan` variant block edge? */

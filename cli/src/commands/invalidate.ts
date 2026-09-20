@@ -12,7 +12,7 @@ export function registerInvalidate(program: Command): void {
   program
     .command('invalidate <node>')
     .description(
-      'Invalidate a node via the invalidate_node RPC. Descendants become stale (derived at read time, nothing written) until this node is restored; firm-block targets are NOT affected',
+      'Invalidate a node via the invalidate_node RPC. Descendants become stale (derived at read time, nothing written) until this node is restored, and nodes this one blocks stop being gated by it — a dead blocker no longer gates. Both are derived: no edge is written, and restoring the node re-arms its blocks',
     )
     .requiredOption('--reason <text>', 'why the node is wrong (stored permanently as context)')
     .option('--json', 'output structured JSON')
@@ -30,7 +30,7 @@ export function registerInvalidate(program: Command): void {
           printJson({ node_id: node.id, reason: opts.reason, result: data ?? null });
         } else {
           console.log(
-            `invalidated ${short(node.id)} "${node.title}" — its subtask descendants are now stale (derived) until this node is restored; block targets are unaffected`,
+            `invalidated ${short(node.id)} "${node.title}" — its subtask descendants are now stale (derived) until this node is restored, and every node it blocks is no longer gated by it (dead blocker); no edge was written`,
           );
         }
       }),

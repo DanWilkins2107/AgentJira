@@ -107,23 +107,42 @@ export function directChildrenSettled(
 
 /**
  * Targets with at least one UNFINISHED firm-family gate — the reason a node
- * is held back from pickup. A firm_block or reassess_after gates until its
- * source is `done`, or — when the source is a `broken_down` parent (a coarse
- * block) — until its subtree is complete (see `subtreeCompleteIds`). A
- * firm_block_plan gates only until the source's PLAN LANDS (source `done`,
- * `broken_down`, OR merge_sha recorded — see `planLanded`), even while the
- * source's own follow-up breakdown continues. An unknown blocker (edge to a node
- * we can't see) counts as unfinished — same as `aj tasks`. Soft blocks (and
- * soft_block_plan) never gate: they are judgment, not a constraint.
+ * is held back from pickup.
+ *
+ * DEAD FIRST: a blocker whose own status is `invalidated`, or that is itself
+ * stale, is **dead** and stops gating outright — for every block-family edge
+ * type. A dead node can never reach `done` (invalidated is terminal; a stale
+ * node is dead until its ancestor is restored), so the plain status rule would
+ * park its target forever with no release but hand-removing the edge. Pass
+ * `deadSet` — the very set `effectivelyInvalidated` returns (invalidated ∪
+ * stale), the same one the callers already use to exclude dead TARGETS; here it
+ * is applied to block SOURCES. Checking it first also means a stale
+ * `broken_down` blocker needs no subtree lookup and a `merge_sha` on an
+ * invalidated one is moot. Nothing is written and no edge changes: restoring
+ * the invalidated node re-arms every block it was carrying.
+ *
+ * Otherwise a firm_block or reassess_after gates until its source is `done`, or
+ * — when the source is a `broken_down` parent (a coarse block) — until its
+ * subtree is complete (see `subtreeCompleteIds`). A firm_block_plan gates only
+ * until the source's PLAN LANDS (source `done`, `broken_down`, OR merge_sha
+ * recorded — see `planLanded`), even while the source's own follow-up breakdown
+ * continues. An unknown blocker (edge to a node we can't see) counts as
+ * unfinished — same as `aj tasks`. Soft blocks (and soft_block_plan) never
+ * gate: they are judgment, not a constraint.
  *
  * Pass the FULL node/edge sets (not a filtered view) so every blocker is present.
  */
-export function firmlyGatedTargets(nodes: GraphNode[], edges: NodeEdge[]): Set<string> {
+export function firmlyGatedTargets(
+  nodes: GraphNode[],
+  edges: NodeEdge[],
+  deadSet: Set<string>,
+): Set<string> {
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const completeIds = subtreeCompleteIds(nodes, edges)
   const gated = new Set<string>()
   for (const e of edges) {
     if (e.removed_at !== null) continue
+    if (deadSet.has(e.source_id)) continue // dead blocker — no longer gates
     const source = nodeById.get(e.source_id)
     if (e.type === 'firm_block' || e.type === 'reassess_after') {
       const satisfied =
@@ -159,7 +178,7 @@ export function readyToPickupIds(
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): Set<string> {
-  const gated = firmlyGatedTargets(nodes, edges)
+  const gated = firmlyGatedTargets(nodes, edges, invalidSet)
   const ready = new Set<string>()
   for (const n of nodes) {
     if (STATUS_META[n.status].turn !== 'agent') continue
@@ -189,7 +208,7 @@ export function agentWorkload(
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): { available: number; inProgress: number } {
-  const gated = firmlyGatedTargets(nodes, edges)
+  const gated = firmlyGatedTargets(nodes, edges, invalidSet)
   let available = 0
   let inProgress = 0
   for (const n of nodes) {
@@ -221,7 +240,7 @@ export function blockedFromPickupIds(
   edges: NodeEdge[],
   invalidSet: Set<string>,
 ): Set<string> {
-  const gated = firmlyGatedTargets(nodes, edges)
+  const gated = firmlyGatedTargets(nodes, edges, invalidSet)
   const blocked = new Set<string>()
   for (const n of nodes) {
     const turn = STATUS_META[n.status].turn
@@ -237,10 +256,13 @@ export function blockedFromPickupIds(
 /**
  * Agent-turn, non-stale nodes carrying at least one ACTIVE soft-family block —
  * shared-decision advice, not a gate (mirrors the "SOFT-BLOCKED" annotation in
- * `aj tasks`). A soft_block is active until its source is done (or, for a
- * broken_down source, its subtree is complete); a soft_block_plan until the
- * source's plan lands (`planLanded` — which a `broken_down` source already
- * satisfies). Independent of firm-gating and claim: a node can be ready AND
+ * `aj tasks`). A soft block from a DEAD source (invalidated or stale — pass the
+ * set from `effectivelyInvalidated`) is not active at all: there is no open
+ * shared decision upstream if the upstream node is dead, and it could never
+ * clear on its own. Otherwise a soft_block is active until its source is done
+ * (or, for a broken_down source, its subtree is complete); a soft_block_plan
+ * until the source's plan lands (`planLanded` — which a `broken_down` source
+ * already satisfies). Independent of firm-gating and claim: a node can be ready AND
  * soft-blocked, or firm-blocked AND soft-blocked — the tag is purely
  * "shared decisions are still open upstream; picking up is a stretch".
  *
@@ -257,6 +279,7 @@ export function softBlockedIds(
   for (const e of edges) {
     if (e.removed_at !== null) continue
     if (e.type !== 'soft_block' && e.type !== 'soft_block_plan') continue
+    if (invalidSet.has(e.source_id)) continue // dead blocker — no longer gates
     const source = nodeById.get(e.source_id)
     const active =
       e.type === 'soft_block_plan'

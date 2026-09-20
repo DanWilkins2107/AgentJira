@@ -318,8 +318,8 @@ export function ActionBar({
             <p className="muted">
               Reverses the invalidation: sets the status back (default = the status it had before
               being invalidated) and clears the reason. Every descendant that was stale because of
-              this node automatically stops being stale — staleness is derived, so nothing is
-              written or deleted anywhere.
+              this node automatically stops being stale, and every block edge out of it starts
+              gating again — both are derived, so nothing is written or deleted anywhere.
             </p>
             <label>
               Restore to status
@@ -359,7 +359,9 @@ export function ActionBar({
             <p className="muted">
               The node stays forever as context. Its subtask descendants become{' '}
               <strong>stale</strong> (derived — nothing is written to them) until this node is
-              restored. Blocked nodes are NOT affected. A reason is required.
+              restored. Nodes this one <strong>blocks</strong> stop being gated by it — a dead
+              blocker can never finish, so it no longer holds anything back; the block edges stay,
+              and restoring this node re-arms them. A reason is required.
             </p>
             <textarea
               autoFocus
