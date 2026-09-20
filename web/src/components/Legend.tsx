@@ -91,8 +91,9 @@ function LegendBody() {
         <span className="legend-blocked-badge-sample">BLOCKED</span>
         <span className="legend-label">
           firm-blocked — waits until the blocker is done (or a broken-down parent's whole subtree
-          completes). Applies to your cards too: a gated human-only action or spec review fades
-          until the gate clears
+          completes). An invalidated or stale blocker is dead and stops gating: no badge, though
+          its edge still draws. Applies to your cards too: a gated human-only action or spec review
+          fades until the gate clears
         </span>
       </div>
       <div className="legend-row">

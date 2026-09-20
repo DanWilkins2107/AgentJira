@@ -31,7 +31,7 @@ Aj tasks is the source of truth. I may have picked up work and done reviews in t
 
 - Skip anything in the "not recommended" section (firm-blocked by unfinished work, deferred via `reassess_after`, or claimed by someone else).
 - A blocker annotated **PLAN LANDED** no longer gates: its decision has landed — the plan document merged, or the blocker was broken down (the approved split *is* the decision) — and that's all this node needed from it (the edge was a `_plan` variant). It becomes required reading for whoever works the node.
-- Prefer unblocked, unclaimed nodes. A blocker in `invalidated` status is a judgment signal, not a hard stop — read its invalidation reason before deciding.
+- Prefer unblocked, unclaimed nodes. A blocker annotated **DEAD** — its own status is `invalidated`, or it is stale — has stopped gating entirely, whatever the edge type: a node held only by dead blockers is in the recommended section and is genuinely yours to pick up. Still read that blocker's invalidation reason first; it is the record of what was tried and why it was wrong, and it usually changes how you do the work.
 - A blocker in `human_only_action` is waiting on the human and nothing else — you cannot clear it, work around it, or do it yourself. Leave the node and pick something else; the human's queue is theirs.
 
 For soft-blocked work, try to evaluate whether it should have a hard block. Ideally we'll remove the soft block and either pick up the work or put a hard block on something else - give this task to a subagent also. 

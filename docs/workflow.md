@@ -197,6 +197,7 @@ flowchart TD
 ```
 
 - A node is stale iff its own status is not `invalidated` and an ancestor via non-removed `subtask` edges currently is. The walk (server: `stale_node_ids`; web: derived in the view) is cycle-safe and depth-capped at 50. Even `done` descendants read as stale — a merged premise can still be stale.
-- **Blocks never affect staleness.** A blocker's status (including `invalidated`) is visible wherever blockers are listed; that's the whole signal.
+- **Blocks never affect staleness.** No block edge can make a node stale — staleness propagates only DOWN non-removed `subtask` edges, never along a block.
+- **The other direction is real: a dead blocker stops gating.** A blocker is **dead** iff its own status is `invalidated` or it is itself stale. A dead blocker no longer gates its target — for every block-family type (`firm_block`, `soft_block`, both `_plan` variants, `reassess_after`) — because it can never reach `done`, so the ordinary "wait until the blocker is done" rule would park the target forever. Checked before the plan-variant and coarse-block rules. Derived at read time like staleness: nothing is written, the edge is never removed, and restoring the invalidated node re-arms the block. The blocker stays listed with its status and its invalidation reason — a released target is not an uninformed one.
 - Stale renders as the dimmed invalidated card treatment plus a solid amber STALE badge; invalidated ancestors are flagged in every descendant's breadcrumb.
 - **Invalidated nodes are not trash.** They stay first-class, readable, and searchable — the invalidation reason is exactly the context that stops the next agent repeating the mistake. Nothing is ever deleted.

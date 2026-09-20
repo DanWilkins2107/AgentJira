@@ -31,9 +31,16 @@ interface BlockerInfo {
   blocker_id: string;
   blocker_title: string;
   blocker_status: NodeStatus | 'unknown';
-  // False once the blocker no longer gates: for plan variants, when its plan has
-  // landed (status done OR broken_down OR merge_sha recorded); for a plain block
-  // on a broken_down source, when that source's subtree is complete.
+  // The blocker is DEAD: its own status is `invalidated`, or it is stale (an
+  // ancestor of it is invalidated). A dead blocker can never reach `done`, so it
+  // stops gating entirely — for every block-family edge type. Reported
+  // separately from `unfinished` so a --json consumer can tell a dead blocker
+  // from a finished one; the blocker stays listed either way.
+  dead: boolean;
+  // False once the blocker no longer gates: when it is dead; for plan variants,
+  // when its plan has landed (status done OR broken_down OR merge_sha recorded);
+  // for a plain block on a broken_down source, when that source's subtree is
+  // complete.
   unfinished: boolean;
 }
 
@@ -154,10 +161,13 @@ export function registerTasks(program: Command): void {
         // broken_down can never reach 'done', so the status rule alone would gate
         // its target forever. Such a source is instead satisfied when its whole
         // subtask subtree is complete (no descendant still in a live status).
-        // Resolve that once, in bulk, via the subtree_complete RPC.
+        // Resolve that once, in bulk, via the subtree_complete RPC. A DEAD
+        // blocker is skipped: it has already stopped gating, so its subtree is
+        // irrelevant (a broken_down node can't be `invalidated`, but it can be
+        // stale).
         const subtreeComplete = new Map<string, boolean>();
         const brokenDownBlockerIds = [...blockerNodes.entries()]
-          .filter(([, b]) => b.status === 'broken_down')
+          .filter(([id, b]) => b.status === 'broken_down' && !staleIds.has(id))
           .map(([id]) => id);
         if (brokenDownBlockerIds.length > 0) {
           const { data: scData, error: scErr } = await sb.rpc('subtree_complete', {
@@ -174,17 +184,32 @@ export function registerTasks(program: Command): void {
         for (const n of nodes) {
           const blockers: BlockerInfo[] = (edgesByTarget.get(n.id) ?? []).map((e) => {
             const b = blockerNodes.get(e.source_id);
-            // Plan variants are satisfied once the blocker's plan LANDS: status
-            // done, status broken_down (the approved split IS the decision,
-            // materialized — a node broken down without a plan-document PR never
-            // reaches done or a merge_sha), OR a merge_sha recorded. A PLAIN
-            // block on a broken_down source is a different thing — a coarse
+            // DEAD FIRST: a blocker whose own status is `invalidated`, or that is
+            // itself stale (an ancestor of it is invalidated), can never reach
+            // `done` — so under the plain status rule it would gate its target
+            // forever, with no release but hand-removing the edge. A dead blocker
+            // stops gating, whatever the edge type. Checking it before the other
+            // rules also means a stale broken_down blocker needs no
+            // subtree_complete lookup and a merge_sha on an invalidated blocker
+            // is moot. `staleIds` already covers every project these tasks live
+            // in, and `aj add-edge` refuses cross-project edges, so a blocker is
+            // always in a project we resolved staleness for.
+            //
+            // Otherwise: plan variants are satisfied once the blocker's plan
+            // LANDS: status done, status broken_down (the approved split IS the
+            // decision, materialized — a node broken down without a plan-document
+            // PR never reaches done or a merge_sha), OR a merge_sha recorded. A
+            // PLAIN block on a broken_down source is a different thing — a coarse
             // block, satisfied only when that source's subtree is complete.
             // Everything else waits for done. Unknown blockers count as
             // unfinished; a missing RPC row is the safe default (unfinished).
             const planVariant = e.type === 'firm_block_plan' || e.type === 'soft_block_plan';
+            const dead =
+              b !== undefined && (b.status === 'invalidated' || staleIds.has(e.source_id));
             let unfinished: boolean;
-            if (!b) {
+            if (dead) {
+              unfinished = false;
+            } else if (!b) {
               unfinished = true;
             } else if (planVariant) {
               unfinished =
@@ -199,6 +224,7 @@ export function registerTasks(program: Command): void {
               blocker_id: e.source_id,
               blocker_title: b?.title ?? '(unknown)',
               blocker_status: b?.status ?? 'unknown',
+              dead,
               unfinished,
             };
           });
@@ -265,11 +291,13 @@ function printTask(t: TaskEntry, ownLabel: string | null): void {
   );
   for (const b of t.blockers) {
     const planVariant = b.edge_type === 'firm_block_plan' || b.edge_type === 'soft_block_plan';
-    const state = b.unfinished
-      ? 'UNFINISHED'
-      : planVariant && b.blocker_status !== 'done'
-        ? 'PLAN LANDED — decision available, no longer gating'
-        : 'finished';
+    const state = b.dead
+      ? 'DEAD — blocker invalidated/stale, no longer gating'
+      : b.unfinished
+        ? 'UNFINISHED'
+        : planVariant && b.blocker_status !== 'done'
+          ? 'PLAN LANDED — decision available, no longer gating'
+          : 'finished';
     const warn =
       (b.edge_type === 'soft_block' || b.edge_type === 'soft_block_plan') && b.unfinished
         ? ' — SOFT-BLOCKED: pick up only if nothing better to do and it is not a stretch'

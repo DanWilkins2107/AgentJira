@@ -148,6 +148,10 @@ export function GraphPage() {
       // IS the decision landing — see `planLanded`), so it holds nobody back and
       // must not inflate the container's "gates N nodes" count.
       if (e.type === 'firm_block_plan' || e.type === 'soft_block_plan') continue
+      // Nor does a block from a DEAD source (invalidated, or stale — a container
+      // can be stale even while broken_down): a dead blocker no longer gates, so
+      // it gates nobody and must not be counted either.
+      if (invalidSet.has(e.source_id)) continue
       gatesBySource.set(e.source_id, (gatesBySource.get(e.source_id) ?? 0) + 1)
     }
 
